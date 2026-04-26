@@ -8,14 +8,24 @@ class TextManager:
     @staticmethod
     def clean_text(text):
         """
-        Limpia el texto de saltos de lnea innecesarios y espacios extra.
+        Limpia el texto de saltos de lnea innecesarios, guiones de divisin de palabras y espacios extra.
         """
-        # Reemplazar saltos de lnea simples por espacios (para unir frases cortadas en el PDF)
-        # pero mantener los saltos de lnea dobles (prrafos)
+        # 1. Quitar guiones de final de lnea (ej: "excep- \n cional" -> "excepcional")
+        text = re.sub(r'-\s*\n\s*', '', text)
+        
+        # 2. Reemplazar saltos de lnea simples por espacios (unir frases cortadas)
+        # pero mantenemos los saltos dobles para prrafos.
         text = re.sub(r'(?<!\n)\n(?!\n)', ' ', text)
         
-        # Eliminar mltiples espacios en blanco
-        text = re.sub(r' +', ' ', text)
+        # 3. Corregir palabras comunes que suelen quedar mal separadas en PDFs (heurstica simple)
+        # Unimos letras sueltas que forman palabras comunes
+        text = re.sub(r'\b(q|Q)\s+(u|U)\s+(e|E)\b', r'\1\2\3', text)
+        text = re.sub(r'\b(l|L)\s+(a|A)\s+(s|S)\b', r'\1\2\3', text)
+        text = re.sub(r'\b(l|L)\s+(o|O)\s+(s|S)\b', r'\1\2\3', text)
+        text = re.sub(r'\b(c|C)\s+(o|O)\s+(n|N)\b', r'\1\2\3', text)
+        
+        # 4. Eliminar mltiples espacios en blanco
+        text = re.sub(r'[ \t]+', ' ', text)
         
         return text.strip()
 
