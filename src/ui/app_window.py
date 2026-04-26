@@ -3,6 +3,8 @@ from tkinter import filedialog
 import os
 import asyncio
 import threading
+import queue
+import time
 
 # Importaciones locales de la capa Core
 from src.core.pdf_parser import extract_text_from_pdf
@@ -25,6 +27,12 @@ class NimbusApp(ctk.CTk):
         self.audio_player = AudioPlayer()
         self.tts_engine = TTSEngine()
         self.text_manager = TextManager()
+        
+        # Variables de control de reproduccin por fragmentos
+        self.audio_queue = queue.Queue()
+        self.stop_event = threading.Event()
+        self.is_paused = False
+        self.current_temp_files = []
         
         # Inicializar y arrancar Hotkeys
         self.hotkey_manager = HotkeyManager(
@@ -108,8 +116,10 @@ class NimbusApp(ctk.CTk):
         if not text:
             return
         
-        # Detener y liberar el archivo actual antes de generar uno nuevo
-        self.audio_player.stop()
+        # Detener cualquier lectura activa y limpiar
+        self.stop_reading()
+        self.stop_event.clear()
+        self.is_paused = False
         
         voice = self.voice_option.get()
         speed_val = int(self.speed_slider.get())
@@ -117,32 +127,91 @@ class NimbusApp(ctk.CTk):
         
         self.tts_engine.voice = voice
         self.tts_engine.rate = rate
-        
-        # Ejecutar generacin en un hilo separado para no bloquear la UI
-        threading.Thread(target=self._generate_and_play, args=(text,), daemon=True).start()
 
-    def _generate_and_play(self, text):
-        temp_file = "temp_audio.mp3"
-        # Usar un loop de asyncio para el hilo
+        # Dividir el texto en fragmentos (chunks)
+        chunks = self.text_manager.get_chunks(text, max_chars=800)
+        
+        # Iniciar hilos Productor (Genera TTS) y Consumidor (Reproduce)
+        threading.Thread(target=self._producer_thread, args=(chunks,), daemon=True).start()
+        threading.Thread(target=self._consumer_thread, daemon=True).start()
+
+    def _producer_thread(self, chunks):
+        """Genera los archivos de audio en segundo plano y los encola."""
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         
-        success = loop.run_until_complete(self.tts_engine.generate_audio(text, temp_file))
-        if success:
-            self.audio_player.load(temp_file)
-            self.audio_player.play()
+        for i, chunk in enumerate(chunks):
+            if self.stop_event.is_set():
+                break
+                
+            temp_file = f"temp_chunk_{i}.mp3"
+            self.current_temp_files.append(temp_file)
+            
+            # Generar audio
+            success = loop.run_until_complete(self.tts_engine.generate_audio(chunk, temp_file))
+            if success and not self.stop_event.is_set():
+                self.audio_queue.put(temp_file)
+
+    def _consumer_thread(self):
+        """Reproduce los archivos de audio de la cola en orden."""
+        while not self.stop_event.is_set():
+            try:
+                # Espera hasta 1 segundo por un nuevo archivo, si no hay sigue comprobando stop_event
+                audio_file = self.audio_queue.get(timeout=1.0)
+            except queue.Empty:
+                # Si la cola est vaca pero el productor termin (ya no hay ms chunks), salimos
+                # (Una mejora futura es sealizar el fin desde el productor, por ahora usamos el timeout)
+                continue
+
+            if self.stop_event.is_set():
+                break
+
+            # Cargar y reproducir el chunk
+            if self.audio_player.load(audio_file):
+                self.audio_player.play()
+
+                # Esperar a que termine de reproducir este chunk
+                while (self.audio_player.is_playing() or self.is_paused) and not self.stop_event.is_set():
+                    time.sleep(0.1)
+
+            self.audio_queue.task_done()
 
     def toggle_pause(self):
         if self.audio_player.is_playing():
             self.audio_player.pause()
+            self.is_paused = True
         else:
             self.audio_player.unpause()
+            self.is_paused = False
 
     def stop_reading(self):
+        self.stop_event.set()
+        self.is_paused = False
         self.audio_player.stop()
+        
+        # Vaciar la cola
+        while not self.audio_queue.empty():
+            try:
+                self.audio_queue.get_nowait()
+            except queue.Empty:
+                break
+                
+        # Limpieza de archivos temporales (opcional, en un hilo pequeo para evitar demoras)
+        threading.Thread(target=self._cleanup_temp_files, daemon=True).start()
+
+    def _cleanup_temp_files(self):
+        time.sleep(0.5) # Dar tiempo a que el player libere el archivo
+        for f in self.current_temp_files:
+            try:
+                if os.path.exists(f):
+                    os.remove(f)
+            except Exception:
+                pass
+        self.current_temp_files.clear()
 
     def destroy(self):
-        """Sobrescribimos destroy para limpiar hotkeys."""
+        """Sobrescribimos destroy para limpiar hotkeys y archivos."""
+        self.stop_reading()
         self.hotkey_manager.stop_listening()
         super().destroy()
 
