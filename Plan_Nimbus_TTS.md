@@ -15,11 +15,11 @@ Este documento sirve para el seguimiento del desarrollo de Nimbus-TTS.
 - [x] Tarea 2.4 - Reproductor: Desarrollar `audio_player.py` (pygame).
 
 ## Épica 3: Interfaz Gráfica (UI)
-- [ ] Tarea 3.1 - Ventana Base: Crear `app_window.py` (CustomTkinter).
-- [ ] Tarea 3.2 - Diseño Layout Principal: TextBox central.
-- [ ] Tarea 3.3 - Panel de Carga: Botón cargar PDF.
-- [ ] Tarea 3.4 - Controles de Reproducción: Botones Play, Pausa y Detener.
-- [ ] Tarea 3.5 - Configuración TTS: Menú desplegable para voz y slider de velocidad.
+- [x] Tarea 3.1 - Ventana Base: Crear `app_window.py` (CustomTkinter).
+- [x] Tarea 3.2 - Diseño Layout Principal: TextBox central.
+- [x] Tarea 3.3 - Panel de Carga: Botón cargar PDF.
+- [x] Tarea 3.4 - Controles de Reproducción: Botones Play, Pausa y Detener.
+- [x] Tarea 3.5 - Configuración TTS: Menú desplegable para voz y slider de velocidad.
 
 ## Épica 4: Atajos Globales (Background Hotkeys)
 - [ ] Tarea 4.1 - Hotkeys Engine: Implementar `hotkeys.py` (keyboard).
