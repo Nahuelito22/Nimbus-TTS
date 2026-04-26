@@ -9,10 +9,10 @@ Este documento sirve para el seguimiento del desarrollo de Nimbus-TTS.
 - [x] Tarea 1.4: Crear la estructura de carpetas.
 
 ## Épica 2: Motor Lógico (Core) - Procesamiento y Audio
-- [ ] Tarea 2.1 - Parser PDF: Desarrollar `pdf_parser.py` (PyMuPDF).
-- [ ] Tarea 2.2 - Gestor de Texto: Desarrollar `text_manager.py`.
-- [ ] Tarea 2.3 - Motor TTS: Desarrollar `tts_engine.py` (edge-tts).
-- [ ] Tarea 2.4 - Reproductor: Desarrollar `audio_player.py` (pygame).
+- [x] Tarea 2.1 - Parser PDF: Desarrollar `pdf_parser.py` (PyMuPDF).
+- [x] Tarea 2.2 - Gestor de Texto: Desarrollar `text_manager.py`.
+- [x] Tarea 2.3 - Motor TTS: Desarrollar `tts_engine.py` (edge-tts).
+- [x] Tarea 2.4 - Reproductor: Desarrollar `audio_player.py` (pygame).
 
 ## Épica 3: Interfaz Gráfica (UI)
 - [ ] Tarea 3.1 - Ventana Base: Crear `app_window.py` (CustomTkinter).
