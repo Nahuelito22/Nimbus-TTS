@@ -22,8 +22,8 @@ Este documento sirve para el seguimiento del desarrollo de Nimbus-TTS.
 - [x] Tarea 3.5 - Configuración TTS: Menú desplegable para voz y slider de velocidad.
 
 ## Épica 4: Atajos Globales (Background Hotkeys)
-- [ ] Tarea 4.1 - Hotkeys Engine: Implementar `hotkeys.py` (keyboard).
-- [ ] Tarea 4.2 - Enlace de Lógica: Conectar el atajo capturado con la reproducción.
+- [x] Tarea 4.1 - Hotkeys Engine: Implementar `hotkeys.py` (keyboard).
+- [x] Tarea 4.2 - Enlace de Lógica: Conectar el atajo capturado con la reproducción.
 
 ## Épica 5: Empaquetado y Distribución
 - [ ] Tarea 5.1 - PyInstaller: Configurar y ejecutar PyInstaller (`nimbus.spec`).

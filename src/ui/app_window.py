@@ -9,6 +9,7 @@ from src.core.pdf_parser import extract_text_from_pdf
 from src.core.text_manager import TextManager
 from src.core.tts_engine import TTSEngine
 from src.core.audio_player import AudioPlayer
+from src.utils.hotkeys import HotkeyManager
 
 ctk.set_appearance_mode("Dark")
 ctk.set_default_color_theme("blue")
@@ -24,6 +25,13 @@ class NimbusApp(ctk.CTk):
         self.audio_player = AudioPlayer()
         self.tts_engine = TTSEngine()
         self.text_manager = TextManager()
+        
+        # Inicializar y arrancar Hotkeys
+        self.hotkey_manager = HotkeyManager(
+            play_pause_callback=self.toggle_pause,
+            stop_callback=self.stop_reading
+        )
+        self.hotkey_manager.start()
         
         self.setup_ui()
 
@@ -129,6 +137,11 @@ class NimbusApp(ctk.CTk):
 
     def stop_reading(self):
         self.audio_player.stop()
+
+    def destroy(self):
+        """Sobrescribimos destroy para limpiar hotkeys."""
+        self.hotkey_manager.stop_listening()
+        super().destroy()
 
 if __name__ == "__main__":
     app = NimbusApp()
