@@ -40,6 +40,7 @@ class AudioPlayer:
     def stop(self):
         """Detiene la reproduccin."""
         pygame.mixer.music.stop()
+        pygame.mixer.music.unload()  # Libera el archivo para que pueda ser sobrescrito
 
     def is_playing(self):
         """Retorna True si hay audio reproducindose."""

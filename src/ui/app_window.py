@@ -108,6 +108,9 @@ class NimbusApp(ctk.CTk):
         if not text:
             return
         
+        # Detener y liberar el archivo actual antes de generar uno nuevo
+        self.audio_player.stop()
+        
         voice = self.voice_option.get()
         speed_val = int(self.speed_slider.get())
         rate = f"{'+' if speed_val >= 0 else ''}{speed_val}%"
