@@ -40,24 +40,54 @@ class TextManager:
     @staticmethod
     def get_chunks(text, max_chars=1000):
         """
-        Opcional: Divide el texto en fragmentos de longitud mxima para procesamiento.
+        Divide el texto en fragmentos que no excedan max_chars,
+        respetando el final de los prrafos si es posible.
+        Retorna una lista de dicts: [{'text': str, 'start': int, 'end': int}, ...]
         """
-        # Por ahora podemos usar los prrafos como chunks naturales
-        paragraphs = TextManager.get_paragraphs(text)
+        paragraphs = text.split('\n\n')
         chunks = []
-        current_chunk = ""
-
-        for p in paragraphs:
-            if len(current_chunk) + len(p) < max_chars:
-                current_chunk += p + "\n\n"
-            else:
-                if current_chunk:
-                    chunks.append(current_chunk.strip())
-                current_chunk = p + "\n\n"
+        current_index = 0
         
-        if current_chunk:
-            chunks.append(current_chunk.strip())
-            
+        for p in paragraphs:
+            p = p.strip()
+            if not p:
+                current_index += 2 # Por los '\n\n'
+                continue
+                
+            # Si el prrafo es muy largo, lo dividimos por frases
+            if len(p) > max_chars:
+                sentences = re.split(r'(?<=[.!?]) +', p)
+                current_chunk = ""
+                chunk_start = current_index
+                
+                for s in sentences:
+                    if len(current_chunk) + len(s) < max_chars:
+                        current_chunk += s + " "
+                    else:
+                        if current_chunk:
+                            chunks.append({
+                                'text': current_chunk.strip(),
+                                'start': chunk_start,
+                                'end': chunk_start + len(current_chunk)
+                            })
+                        current_chunk = s + " "
+                        chunk_start = text.find(s, chunk_start)
+                
+                if current_chunk:
+                    chunks.append({
+                        'text': current_chunk.strip(),
+                        'start': chunk_start,
+                        'end': chunk_start + len(current_chunk)
+                    })
+            else:
+                start_pos = text.find(p, current_index)
+                chunks.append({
+                    'text': p,
+                    'start': start_pos,
+                    'end': start_pos + len(p)
+                })
+                current_index = start_pos + len(p)
+                
         return chunks
 
 if __name__ == "__main__":

@@ -117,6 +117,9 @@ class NimbusApp(ctk.CTk):
         self.textbox = ctk.CTkTextbox(self.main_frame, font=("Inter", 13))
         self.textbox.grid(row=1, column=0, sticky="nsew")
         self.textbox.insert("0.0", "Pega tu texto aqu o sube un PDF...")
+        
+        # Configurar tag de resaltado
+        self.textbox.tag_config("highlight", background="#2a5a8a", foreground="white")
 
         # Bottom Bar: Controles de Audio
         self.controls_bar = ctk.CTkFrame(self.main_frame, height=80)
@@ -151,6 +154,9 @@ class NimbusApp(ctk.CTk):
         self.stop_event.clear()
         self.is_paused = False
         
+        # Limpiar resaltados previos
+        self.textbox.tag_remove("highlight", "1.0", "end")
+        
         # Tomar valores actuales
         self.tts_engine.voice = self.voice_option.get()
         speed_val = int(self.speed_slider.get())
@@ -176,23 +182,25 @@ class NimbusApp(ctk.CTk):
             self.current_temp_files.append(temp_file)
             
             # Generar audio
-            success = loop.run_until_complete(self.tts_engine.generate_audio(chunk, temp_file))
+            success = loop.run_until_complete(self.tts_engine.generate_audio(chunk['text'], temp_file))
             if success and not self.stop_event.is_set():
-                self.audio_queue.put(temp_file)
+                self.audio_queue.put((temp_file, chunk['start'], chunk['end']))
 
     def _consumer_thread(self):
         """Reproduce los archivos de audio de la cola en orden."""
         while not self.stop_event.is_set():
             try:
-                # Espera hasta 1 segundo por un nuevo archivo, si no hay sigue comprobando stop_event
-                audio_file = self.audio_queue.get(timeout=1.0)
+                # Espera hasta 1 segundo por un nuevo archivo
+                audio_data = self.audio_queue.get(timeout=1.0)
+                audio_file, start_idx, end_idx = audio_data
             except queue.Empty:
-                # Si la cola est vaca pero el productor termin (ya no hay ms chunks), salimos
-                # (Una mejora futura es sealizar el fin desde el productor, por ahora usamos el timeout)
                 continue
 
             if self.stop_event.is_set():
                 break
+
+            # Resaltar texto en el hilo principal
+            self.after(0, lambda s=start_idx, e=end_idx: self._highlight_text(s, e))
 
             # Cargar y reproducir el chunk
             if self.audio_player.load(audio_file):
@@ -217,6 +225,9 @@ class NimbusApp(ctk.CTk):
         self.is_paused = False
         self.audio_player.stop()
         
+        # Limpiar resaltado
+        self.textbox.tag_remove("highlight", "1.0", "end")
+        
         # Vaciar la cola
         while not self.audio_queue.empty():
             try:
@@ -226,6 +237,17 @@ class NimbusApp(ctk.CTk):
                 
         # Limpieza de archivos temporales
         self._cleanup_temp_files()
+
+    def _highlight_text(self, start, end):
+        """Resalta el texto y hace scroll hasta la posicin."""
+        self.textbox.tag_remove("highlight", "1.0", "end")
+        
+        # Convertir offsets de caracteres a ndices de tkinter (linea.columna)
+        start_idx = f"1.0 + {start}c"
+        end_idx = f"1.0 + {end}c"
+        
+        self.textbox.tag_add("highlight", start_idx, end_idx)
+        self.textbox.see(start_idx)
 
     def _cleanup_temp_files(self):
         """Intenta borrar los archivos temporales actuales."""
