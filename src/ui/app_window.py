@@ -12,6 +12,7 @@ from src.core.text_manager import TextManager
 from src.core.tts_engine import TTSEngine
 from src.core.audio_player import AudioPlayer
 from src.utils.hotkeys import HotkeyManager
+from src.utils.config_manager import ConfigManager
 
 ctk.set_appearance_mode("Dark")
 ctk.set_default_color_theme("blue")
@@ -23,9 +24,15 @@ class NimbusApp(ctk.CTk):
         self.title("Nimbus-TTS - Estudio Inteligente")
         self.geometry("900x600")
 
+        # Inicializar gestor de configuracin
+        self.config_manager = ConfigManager()
+
         # Inicializar componentes lógicos
         self.audio_player = AudioPlayer()
-        self.tts_engine = TTSEngine()
+        self.tts_engine = TTSEngine(
+            voice=self.config_manager.get("voice"),
+            rate=self.config_manager.get("rate")
+        )
         self.text_manager = TextManager()
         
         # Variables de control de reproduccin por fragmentos
@@ -34,12 +41,15 @@ class NimbusApp(ctk.CTk):
         self.is_paused = False
         self.current_temp_files = []
         
-        # Inicializar y arrancar Hotkeys
+        # Inicializar y arrancar Hotkeys con la config guardada
         self.hotkey_manager = HotkeyManager(
             play_pause_callback=self.toggle_pause,
             stop_callback=self.stop_reading
         )
-        self.hotkey_manager.start()
+        self.hotkey_manager.update_hotkeys(
+            self.config_manager.get("hotkey_play_pause"),
+            self.config_manager.get("hotkey_stop")
+        )
         
         self.setup_ui()
 
@@ -59,16 +69,32 @@ class NimbusApp(ctk.CTk):
         self.voice_label = ctk.CTkLabel(self.sidebar_frame, text="Seleccionar Voz:")
         self.voice_label.pack(padx=20, pady=(10, 0))
         
-        self.voice_option = ctk.CTkOptionMenu(self.sidebar_frame, values=self.tts_engine.list_voices())
+        self.voice_option = ctk.CTkOptionMenu(self.sidebar_frame, values=self.tts_engine.list_voices(), command=self.change_voice)
+        self.voice_option.set(self.config_manager.get("voice"))
         self.voice_option.pack(padx=20, pady=10)
 
         # Velocidad
         self.speed_label = ctk.CTkLabel(self.sidebar_frame, text="Velocidad:")
         self.speed_label.pack(padx=20, pady=(10, 0))
         
-        self.speed_slider = ctk.CTkSlider(self.sidebar_frame, from_=-50, to=50, number_of_steps=10)
-        self.speed_slider.set(0)
+        # Convertir rate string (e.g. "+10%") a float para el slider
+        rate_str = self.config_manager.get("rate").replace("%", "")
+        initial_speed = int(rate_str) if rate_str else 0
+        
+        self.speed_slider = ctk.CTkSlider(self.sidebar_frame, from_=-50, to=50, number_of_steps=10, command=self.change_speed)
+        self.speed_slider.set(initial_speed)
         self.speed_slider.pack(padx=20, pady=10)
+
+        # Atajo Play/Pause
+        self.hk_label = ctk.CTkLabel(self.sidebar_frame, text="Atajo Play/Pause:")
+        self.hk_label.pack(padx=20, pady=(10, 0))
+        
+        self.hk_entry = ctk.CTkEntry(self.sidebar_frame, placeholder_text="ctrl+alt+p")
+        self.hk_entry.insert(0, self.config_manager.get("hotkey_play_pause"))
+        self.hk_entry.pack(padx=20, pady=10)
+        
+        self.save_hk_button = ctk.CTkButton(self.sidebar_frame, text="Guardar Atajo", command=self.save_hotkeys, height=24)
+        self.save_hk_button.pack(padx=20, pady=5)
 
         # --- MAIN CONTENT ---
         self.main_frame = ctk.CTkFrame(self, corner_radius=0)
@@ -121,12 +147,10 @@ class NimbusApp(ctk.CTk):
         self.stop_event.clear()
         self.is_paused = False
         
-        voice = self.voice_option.get()
+        # Tomar valores actuales
+        self.tts_engine.voice = self.voice_option.get()
         speed_val = int(self.speed_slider.get())
-        rate = f"{'+' if speed_val >= 0 else ''}{speed_val}%"
-        
-        self.tts_engine.voice = voice
-        self.tts_engine.rate = rate
+        self.tts_engine.rate = f"{'+' if speed_val >= 0 else ''}{speed_val}%"
 
         # Dividir el texto en fragmentos (chunks)
         chunks = self.text_manager.get_chunks(text, max_chars=800)
@@ -208,6 +232,22 @@ class NimbusApp(ctk.CTk):
             except Exception:
                 pass
         self.current_temp_files.clear()
+
+    # --- CONFIGURACIN ---
+    
+    def change_voice(self, voice):
+        self.config_manager.set("voice", voice)
+
+    def change_speed(self, speed):
+        rate = f"{'+' if int(speed) >= 0 else ''}{int(speed)}%"
+        self.config_manager.set("rate", rate)
+
+    def save_hotkeys(self):
+        new_hk = self.hk_entry.get().strip()
+        if new_hk:
+            self.config_manager.set("hotkey_play_pause", new_hk)
+            self.hotkey_manager.update_hotkeys(new_hk, self.config_manager.get("hotkey_stop"))
+            print(f"Atajo actualizado a: {new_hk}")
 
     def destroy(self):
         """Sobrescribimos destroy para limpiar hotkeys y archivos."""

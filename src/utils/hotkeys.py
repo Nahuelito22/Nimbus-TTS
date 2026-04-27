@@ -11,16 +11,22 @@ class HotkeyManager:
 
     def start(self):
         """
-        Registra los atajos e inicia el escucha en un hilo separado.
+        Registra los atajos e inicia el escucha.
         """
-        # Definimos los atajos por defecto
-        # Ctrl + Alt + P para Play/Pause
-        if self.play_pause_callback:
-            keyboard.add_hotkey('ctrl+alt+p', self.play_pause_callback)
-        
-        # Ctrl + Alt + S para Stop
-        if self.stop_callback:
-            keyboard.add_hotkey('ctrl+alt+s', self.stop_callback)
+        self.update_hotkeys('ctrl+alt+p', 'ctrl+alt+s')
+
+    def update_hotkeys(self, play_pause_key, stop_key):
+        """
+        Actualiza los hotkeys registrados.
+        """
+        try:
+            keyboard.unhook_all()
+            if self.play_pause_callback:
+                keyboard.add_hotkey(play_pause_key, self.play_pause_callback)
+            if self.stop_callback:
+                keyboard.add_hotkey(stop_key, self.stop_callback)
+        except Exception as e:
+            print(f"Error al actualizar hotkeys: {e}")
 
     def stop_listening(self):
         """
