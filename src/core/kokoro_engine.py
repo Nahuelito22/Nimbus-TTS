@@ -16,7 +16,7 @@ class KokoroEngine:
         os.makedirs(self.models_dir, exist_ok=True)
         self.model_name = "model.onnx"
         self.voices_name = "voices.json"
-        self.repo_id = "onnx-community/Kokoro-82M-ONNX"
+        self.repo_id = "NeuML/kokoro-base-onnx"
         self._voice = None
 
     def is_installed(self):

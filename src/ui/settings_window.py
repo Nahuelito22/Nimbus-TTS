@@ -242,7 +242,7 @@ class SettingsWindow(ctk.CTkToplevel):
         
         # Añadir Kokoro a la lista de DESCARGAS si no está instalada
         if not self.kokoro_engine.is_installed():
-            self.voice_label_to_id["[Premium] Kokoro-82M (80MB)"] = "KOKORO_ID"
+            self.voice_label_to_id["[Premium] Kokoro (340MB)"] = "KOKORO_ID"
             
         self.available_voices_labels = list(self.voice_label_to_id.keys())
 
@@ -254,11 +254,11 @@ class SettingsWindow(ctk.CTkToplevel):
                 self._build_available_labels(voices_data)
                 self.after(0, self._safe_update_catalog)
             elif self.winfo_exists():
-                self.after(0, lambda: self.download_option.configure(values=["Error al cargar catálogo"]))
+                self.after(0, lambda: self.download_option.configure(values=["Error al cargar catálogo"]) if self.winfo_exists() else None)
         except Exception as e:
             print(f"Error cargando voces remotas: {e}")
             if self.winfo_exists():
-                self.after(0, lambda: self.download_option.configure(values=["Error de conexión"]))
+                self.after(0, lambda: self.download_option.configure(values=["Error de conexión"]) if self.winfo_exists() else None)
 
     def _safe_update_catalog(self):
         """Actualización segura de la UI."""
@@ -286,7 +286,7 @@ class SettingsWindow(ctk.CTkToplevel):
         if success and self.winfo_exists():
             self.after(0, lambda: self._on_download_success(label))
         elif self.winfo_exists():
-            self.after(0, lambda: self.btn_download.configure(state="normal", text="Error. Reintentar"))
+            self.after(0, lambda: self.btn_download.configure(state="normal", text="Error. Reintentar") if self.winfo_exists() else None)
 
     def _on_download_success(self, label):
         self.btn_download.configure(state="normal", text="Descargar Voz Seleccionada")
@@ -297,7 +297,7 @@ class SettingsWindow(ctk.CTkToplevel):
 
     def _start_kokoro_download(self):
         self.btn_download.configure(state="disabled", text="Descargando Kokoro...")
-        self.status_label.configure(text="Bajando Motor Premium (80MB)...", text_color="#3498db")
+        self.status_label.configure(text="Bajando Motor Premium (340MB)...", text_color="#3498db")
         threading.Thread(target=self._kokoro_download_thread, daemon=True).start()
 
     def _kokoro_download_thread(self):
@@ -305,7 +305,7 @@ class SettingsWindow(ctk.CTkToplevel):
         if success and self.winfo_exists():
             self.after(0, self._safe_on_kokoro_success)
         elif self.winfo_exists():
-            self.after(0, lambda: self.btn_download.configure(state="normal", text="Error. Reintentar Kokoro"))
+            self.after(0, lambda: self.btn_download.configure(state="normal", text="Error. Reintentar Kokoro") if self.winfo_exists() else None)
 
     def _safe_on_kokoro_success(self):
         if self.winfo_exists():
