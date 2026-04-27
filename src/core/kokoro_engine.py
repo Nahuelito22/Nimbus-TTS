@@ -15,7 +15,7 @@ class KokoroEngine:
             
         os.makedirs(self.models_dir, exist_ok=True)
         self.model_name = "model.onnx"
-        self.voices_name = "voices.json"
+        self.voices_name = "voices.bin"
         self.repo_id = "NeuML/kokoro-base-onnx"
         self._voice = None
 
@@ -25,20 +25,24 @@ class KokoroEngine:
                 os.path.exists(os.path.join(self.models_dir, self.voices_name)))
 
     def download_model(self, progress_callback=None):
-        """Descarga el modelo Kokoro desde Hugging Face."""
+        """Descarga el modelo y las voces binarias oficiales."""
         try:
-            # Descargar ONNX
+            # 1. Descargar Modelo ONNX desde Hugging Face
             hf_hub_download(
                 repo_id=self.repo_id,
                 filename=self.model_name,
                 local_dir=self.models_dir
             )
-            # Descargar Voices
-            hf_hub_download(
-                repo_id=self.repo_id,
-                filename=self.voices_name,
-                local_dir=self.models_dir
-            )
+            
+            # 2. Descargar Voces Binarias (.bin) desde el origen oficial
+            # Este archivo es el que requiere la librería moderna
+            voices_url = "https://github.com/thewh1teagle/kokoro-onnx/releases/download/model-files-v1.0/voices-v1.0.bin"
+            response = requests.get(voices_url, stream=True)
+            if response.status_code == 200:
+                with open(os.path.join(self.models_dir, self.voices_name), 'wb') as f:
+                    for chunk in response.iter_content(chunk_size=8192):
+                        f.write(chunk)
+            
             return True
         except Exception as e:
             print(f"Error descargando Kokoro: {e}")
@@ -57,7 +61,22 @@ class KokoroEngine:
             voices_path = os.path.join(self.models_dir, self.voices_name)
             
             if not self._voice:
-                self._voice = Kokoro(model_path, voices_path)
+                import numpy as np
+                # Parche: Guardar el valor original de np.load
+                original_load = np.load
+                # Crear una versión de np.load que siempre permita pickle
+                def patched_load(*args, **kwargs):
+                    kwargs['allow_pickle'] = True
+                    return original_load(*args, **kwargs)
+                
+                # Aplicar el parche temporalmente
+                np.load = patched_load
+                try:
+                    from kokoro_onnx import Kokoro
+                    self._voice = Kokoro(model_path, voices_path)
+                finally:
+                    # Restaurar np.load original pase lo que pase
+                    np.load = original_load
             
             samples, sample_rate = self._voice.create(text, voice=voice, speed=1.0, lang="en-us")
             sf.write(output_path, samples, sample_rate)
