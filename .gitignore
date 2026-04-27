@@ -222,4 +222,7 @@ ayudas_y_recursos/
 
 # Modelos de voz y caché
 models/
-.cache/
+.cache/
+
+# Archivos de configuración local (Sensibles)
+config.json
