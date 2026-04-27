@@ -13,8 +13,9 @@ from src.core.tts_engine import TTSEngine
 from src.core.audio_player import AudioPlayer
 from src.utils.hotkeys import HotkeyManager
 from src.utils.config_manager import ConfigManager
+from src.ui.settings_window import SettingsWindow
 
-ctk.set_appearance_mode("Dark")
+ctk.set_appearance_mode("Dark") # Fallback inicial
 ctk.set_default_color_theme("blue")
 
 class NimbusApp(ctk.CTk):
@@ -26,6 +27,7 @@ class NimbusApp(ctk.CTk):
 
         # Inicializar gestor de configuracin
         self.config_manager = ConfigManager()
+        ctk.set_appearance_mode(self.config_manager.get("appearance_mode"))
 
         # Inicializar componentes lógicos
         self.audio_player = AudioPlayer()
@@ -85,16 +87,13 @@ class NimbusApp(ctk.CTk):
         self.speed_slider.set(initial_speed)
         self.speed_slider.pack(padx=20, pady=10)
 
-        # Atajo Play/Pause
-        self.hk_label = ctk.CTkLabel(self.sidebar_frame, text="Atajo Play/Pause:")
-        self.hk_label.pack(padx=20, pady=(10, 0))
-        
-        self.hk_entry = ctk.CTkEntry(self.sidebar_frame, placeholder_text="ctrl+alt+p")
-        self.hk_entry.insert(0, self.config_manager.get("hotkey_play_pause"))
-        self.hk_entry.pack(padx=20, pady=10)
-        
-        self.save_hk_button = ctk.CTkButton(self.sidebar_frame, text="Guardar Atajo", command=self.save_hotkeys, height=24)
-        self.save_hk_button.pack(padx=20, pady=5)
+        # Espacio flexible para empujar el botn de ajustes al fondo
+        self.sidebar_spacer = ctk.CTkLabel(self.sidebar_frame, text="")
+        self.sidebar_spacer.pack(expand=True, fill="both")
+
+        # Botn de Configuracin
+        self.settings_button = ctk.CTkButton(self.sidebar_frame, text="Configuracin", command=self.open_settings, fg_color="gray25", hover_color="gray35")
+        self.settings_button.pack(padx=20, pady=20)
 
         # --- MAIN CONTENT ---
         self.main_frame = ctk.CTkFrame(self, corner_radius=0)
@@ -242,12 +241,10 @@ class NimbusApp(ctk.CTk):
         rate = f"{'+' if int(speed) >= 0 else ''}{int(speed)}%"
         self.config_manager.set("rate", rate)
 
-    def save_hotkeys(self):
-        new_hk = self.hk_entry.get().strip()
-        if new_hk:
-            self.config_manager.set("hotkey_play_pause", new_hk)
-            self.hotkey_manager.update_hotkeys(new_hk, self.config_manager.get("hotkey_stop"))
-            print(f"Atajo actualizado a: {new_hk}")
+    def open_settings(self):
+        # Abrir la ventana de configuraciones
+        settings_win = SettingsWindow(self, self.config_manager, self.hotkey_manager)
+        settings_win.grab_set() # Hacerla modal (bloquea la principal hasta cerrar)
 
     def destroy(self):
         """Sobrescribimos destroy para limpiar hotkeys y archivos."""

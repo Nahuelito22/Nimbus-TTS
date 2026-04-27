@@ -11,7 +11,8 @@ class ConfigManager:
             "voice": "es-ES-AlvaroNeural",
             "rate": "0%",
             "hotkey_play_pause": "ctrl+alt+p",
-            "hotkey_stop": "ctrl+alt+s"
+            "hotkey_stop": "ctrl+alt+s",
+            "appearance_mode": "Dark"
         }
         self.config = self.load_config()
 
