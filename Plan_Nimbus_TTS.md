@@ -28,3 +28,10 @@ Este documento sirve para el seguimiento del desarrollo de Nimbus-TTS.
 ## Épica 5: Empaquetado y Distribución
 - [ ] Tarea 5.1 - PyInstaller: Configurar y ejecutar PyInstaller (`nimbus.spec`).
 - [ ] Tarea 5.2 - GitHub Actions: Crear workflow de CI/CD para release automático.
+
+## Épica 6: Funcionalidades Premium y UX
+- [ ] Tarea 6.1 - Focus Mode: Resaltado visual del texto mientras se lee.
+- [ ] Tarea 6.2 - Drag & Drop: Soporte para arrastrar archivos PDF a la app.
+- [ ] Tarea 6.3 - Resúmenes con IA: Integración de IA para resumir textos largos.
+- [ ] Tarea 6.4 - System Tray: Minimizar la app a la bandeja del sistema.
+- [ ] Tarea 6.5 - Historial: Lista de archivos PDF abiertos recientemente.
