@@ -157,6 +157,12 @@ class NimbusApp(ctk.CTk, TkinterDnD.DnDWrapper):
         self.load_button = ctk.CTkButton(self.top_bar, text="Subir PDF", command=self.load_pdf)
         self.load_button.pack(side="left", padx=5)
 
+        # Historial de Recientes
+        self.recent_files = self.config_manager.get("recent_files")
+        self.history_menu = ctk.CTkOptionMenu(self.top_bar, values=["Recientes"] + self.recent_files, command=self._load_recent_file)
+        self.history_menu.set("Recientes")
+        self.history_menu.pack(side="left", padx=5)
+
         self.summary_btn = ctk.CTkButton(self.top_bar, text="Resumen IA", command=self.generate_ai_summary, fg_color="#7d56f5", hover_color="#6344c7")
         self.summary_btn.pack(side="left", padx=5)
 
@@ -264,6 +270,38 @@ class NimbusApp(ctk.CTk, TkinterDnD.DnDWrapper):
         self.view_selector.set("Texto Original")
         self.view_frame.grid()
         self._update_textbox(clean_text)
+        
+        # Actualizar historial
+        self._update_history(file_path)
+
+    def _update_history(self, file_path):
+        """Actualiza la lista de archivos recientes."""
+        history = self.config_manager.get("recent_files") or []
+        if file_path in history:
+            history.remove(file_path)
+        history.insert(0, file_path)
+        history = history[:5] # Guardar últimos 5
+        self.config_manager.set("recent_files", history)
+        
+        # Actualizar menú
+        self.history_menu.configure(values=["Recientes"] + history)
+        self.history_menu.set("Recientes")
+
+    def _load_recent_file(self, file_path):
+        """Carga un archivo desde el historial."""
+        if file_path == "Recientes":
+            return
+            
+        if os.path.exists(file_path):
+            self._process_file(file_path)
+        else:
+            messagebox.showerror("Error", "El archivo ya no existe en esa ubicación.")
+            # Opcional: eliminar del historial
+            history = self.config_manager.get("recent_files")
+            if file_path in history:
+                history.remove(file_path)
+                self.config_manager.set("recent_files", history)
+                self.history_menu.configure(values=["Recientes"] + history)
 
     def start_reading(self):
         text = self.textbox.get("0.0", "end").strip()

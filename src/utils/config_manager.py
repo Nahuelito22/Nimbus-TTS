@@ -18,7 +18,8 @@ class ConfigManager:
             "models_path": os.path.join(os.getcwd(), "models"),
             "gemini_api_key": "",
             "openai_api_key": "",
-            "preferred_ai_provider": "Gemini"
+            "preferred_ai_provider": "Gemini",
+            "recent_files": []
         }
         self.config = self.load_config()
 
