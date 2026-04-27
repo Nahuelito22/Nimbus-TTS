@@ -216,3 +216,10 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Archivos de ayuda para el agente
+ayudas_y_recursos/
+
+# Modelos de voz y caché
+models/
+.cache/

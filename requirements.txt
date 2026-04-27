@@ -1,0 +1,9 @@
+customtkinter
+pygame
+edge-tts
+keyboard
+pypdf
+tkinterdnd2
+huggingface_hub
+piper-tts
+requests
