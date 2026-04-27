@@ -12,18 +12,17 @@ class SettingsWindow(ctk.CTkToplevel):
         self.piper_engine = parent.piper_engine
         self.kokoro_engine = parent.kokoro_engine
         
-        # Mapeo de labels a IDs para el catálogo
+        # Mapeo de labels a IDs
         self.voice_label_to_id = {}
         
-        # Intentar carga inmediata SOLO desde caché (rápido, no bloquea)
+        # Carga inicial rápida de caché
         cached_voices = self.piper_engine.get_cached_voices_if_any()
         if cached_voices:
-            self.voice_label_to_id = {v["label"]: v["id"] for v in cached_voices}
-            self.available_voices_labels = list(self.voice_label_to_id.keys())
+            self._build_available_labels(cached_voices)
         else:
             self.available_voices_labels = ["Cargando catálogo..."]
         
-        self.title("Configuracion de Nimbus-TTS")
+        self.title("Configuración de Nimbus-TTS")
         self.geometry("500x650")
         self.after(100, self.lift)
         
@@ -91,51 +90,42 @@ class SettingsWindow(ctk.CTkToplevel):
         tab.grid_columnconfigure(0, weight=1)
         padx, pady = 20, 10
 
-        ctk.CTkLabel(tab, text="Gestor de Modelos (Hugging Face)", font=ctk.CTkFont(size=16, weight="bold")).grid(row=0, column=0, padx=padx, pady=(10, 5), sticky="w")
+        # --- TÍTULO Y DESCRIPCIÓN ---
+        ctk.CTkLabel(tab, text="Gestor de Modelos Offline", font=ctk.CTkFont(size=18, weight="bold")).grid(row=0, column=0, padx=padx, pady=(15, 5), sticky="w")
+        desc = "Descarga voces para leer sin internet. Tienes voces Estándar (Piper) y calidad Premium (Kokoro)."
+        ctk.CTkLabel(tab, text=desc, wraplength=450, justify="left", text_color="gray").grid(row=1, column=0, padx=padx, pady=(0, 20), sticky="w")
         
-        # Texto explicativo
-        info_text = ("Piper es un motor TTS optimizado para funcionar sin internet (Offline). "
-                     "Estos modelos descargan archivos pequeños (.onnx) que corren muy rápido en tu CPU. "
-                     "En el futuro se podrían soportar motores más pesados.")
+        # --- 1. DESCARGAR ---
+        ctk.CTkLabel(tab, text="1. Descargar nueva voz:", font=ctk.CTkFont(weight="bold")).grid(row=2, column=0, padx=padx, pady=(5, 5), sticky="w")
         
-        ctk.CTkLabel(tab, text=info_text, wraplength=450, justify="left", text_color="gray").grid(row=1, column=0, padx=padx, pady=(0, 15), sticky="w")
-        
-        # Voces disponibles para descargar (Carga asíncrona)
-        ctk.CTkLabel(tab, text="Descargar nueva voz:").grid(row=2, column=0, padx=padx, pady=(5, 0), sticky="w")
         self.download_option = ctk.CTkOptionMenu(tab, values=self.available_voices_labels)
-        self.download_option.grid(row=3, column=0, padx=padx, pady=pady, sticky="ew")
+        self.download_option.grid(row=3, column=0, padx=padx, pady=5, sticky="ew")
         
-        # Lanzar hilo para cargar voces
-        threading.Thread(target=self._load_remote_voices, daemon=True).start()
+        self.btn_download = ctk.CTkButton(tab, text="Descargar Voz Seleccionada", command=self._start_download)
+        self.btn_download.grid(row=4, column=0, padx=padx, pady=10, sticky="ew")
         
-        self.btn_download = ctk.CTkButton(tab, text="Descargar de Hugging Face", command=self._start_download)
-        self.btn_download.grid(row=4, column=0, padx=padx, pady=5, sticky="ew")
-        
-        self.status_label = ctk.CTkLabel(tab, text="", text_color="gray")
-        self.status_label.grid(row=5, column=0, padx=padx, pady=2)
+        self.status_label = ctk.CTkLabel(tab, text="", text_color="#3498db")
+        self.status_label.grid(row=5, column=0, padx=padx, pady=0)
 
+        # --- 2. DESCARGADOS ---
+        ctk.CTkLabel(tab, text="2. Voces ya descargadas:", font=ctk.CTkFont(weight="bold")).grid(row=6, column=0, padx=padx, pady=(20, 5), sticky="w")
+        
         self.local_voices_option = ctk.CTkOptionMenu(tab, values=self._get_local_voices_list())
-        self.local_voices_option.grid(row=7, column=0, padx=padx, pady=pady, sticky="ew")
-        
-        # --- KOKORO PREMIUM ---
-        ctk.CTkLabel(tab, text="Voz Premium Offline (Kokoro)", font=ctk.CTkFont(weight="bold")).grid(row=8, column=0, padx=padx, pady=(20, 5), sticky="w")
-        
-        kokoro_status = "Instalada" if self.kokoro_engine.is_installed() else "No instalada"
-        self.btn_kokoro = ctk.CTkButton(tab, text=f"Descargar Kokoro (80MB) - {kokoro_status}", command=self._start_kokoro_download)
-        if self.kokoro_engine.is_installed():
-            self.btn_kokoro.configure(state="disabled", fg_color="green")
-        self.btn_kokoro.grid(row=9, column=0, padx=padx, pady=5, sticky="ew")
+        self.local_voices_option.grid(row=7, column=0, padx=padx, pady=5, sticky="ew")
 
-        # --- CARPETA DE MODELOS ---
-        ctk.CTkLabel(tab, text="Carpeta de Almacenamiento:", font=ctk.CTkFont(weight="bold")).grid(row=8, column=0, padx=padx, pady=(20, 5), sticky="w")
+        # --- 3. CARPETA ---
+        ctk.CTkLabel(tab, text="3. Carpeta de Almacenamiento", font=ctk.CTkFont(weight="bold")).grid(row=8, column=0, padx=padx, pady=(25, 5), sticky="w")
         
-        self.path_entry = ctk.CTkEntry(tab, placeholder_text="Selecciona carpeta...")
-        self.path_entry.insert(0, self.config_manager.get("models_path"))
+        self.path_entry = ctk.CTkEntry(tab)
+        self.path_entry.insert(0, self.piper_engine.models_dir)
         self.path_entry.configure(state="readonly")
-        self.path_entry.grid(row=9, column=0, padx=padx, pady=(0, 5), sticky="ew")
+        self.path_entry.grid(row=9, column=0, padx=padx, pady=5, sticky="ew")
         
-        self.btn_browse = ctk.CTkButton(tab, text="Cambiar Carpeta", fg_color="gray30", command=self._browse_models_dir)
-        self.btn_browse.grid(row=10, column=0, padx=padx, pady=5, sticky="ew")
+        self.btn_browse = ctk.CTkButton(tab, text="Cambiar Ubicación", fg_color="gray30", command=self._browse_models_dir)
+        self.btn_browse.grid(row=10, column=0, padx=padx, pady=(5, 20), sticky="ew")
+
+        # Hilo para cargar el catálogo completo
+        threading.Thread(target=self._load_remote_voices, daemon=True).start()
 
     def _setup_ai_tab(self):
         tab = self.tabview.tab("Inteligencia Artificial")
@@ -246,19 +236,22 @@ class SettingsWindow(ctk.CTkToplevel):
         self.config_manager.save_config()
         self.hotkey_manager.update_hotkeys(self.pp_entry.get().strip().lower(), self.stop_entry.get().strip().lower())
         self.destroy()
-    def _load_remote_voices(self):
-        """Carga el catálogo de voces en segundo plano (si no estaba en caché)."""
-        # Si ya cargamos las voces en el __init__ (desde caché), no hace falta re-descargar
-        if self.voice_label_to_id:
-            return
+    def _build_available_labels(self, voices_data):
+        """Construye la lista de etiquetas incluyendo Kokoro."""
+        self.voice_label_to_id = {v["label"]: v["id"] for v in voices_data}
+        
+        # Añadir Kokoro a la lista de DESCARGAS si no está instalada
+        if not self.kokoro_engine.is_installed():
+            self.voice_label_to_id["[Premium] Kokoro-82M (80MB)"] = "KOKORO_ID"
+            
+        self.available_voices_labels = list(self.voice_label_to_id.keys())
 
+    def _load_remote_voices(self):
+        """Carga el catálogo en segundo plano."""
         try:
             voices_data = self.piper_engine.get_available_spanish_voices()
             if voices_data and self.winfo_exists():
-                # Limpiar y llenar mapeo
-                self.voice_label_to_id = {v["label"]: v["id"] for v in voices_data}
-                self.available_voices_labels = list(self.voice_label_to_id.keys())
-                
+                self._build_available_labels(voices_data)
                 self.after(0, self._safe_update_catalog)
             elif self.winfo_exists():
                 self.after(0, lambda: self.download_option.configure(values=["Error al cargar catálogo"]))
@@ -273,8 +266,38 @@ class SettingsWindow(ctk.CTkToplevel):
             self.download_option.configure(values=self.available_voices_labels)
             self.download_option.set(self.available_voices_labels[0])
 
+    def _start_download(self):
+        label = self.download_option.get()
+        if label == "Cargando catálogo..." or "Error" in label:
+            return
+            
+        if "[Premium] Kokoro" in label:
+            self._start_kokoro_download()
+            return
+
+        voice_id = self.voice_label_to_id.get(label)
+        if voice_id:
+            self.btn_download.configure(state="disabled", text="Descargando...")
+            self.status_label.configure(text=f"Bajando {label}...", text_color="#3498db")
+            threading.Thread(target=self._download_thread, args=(voice_id, label), daemon=True).start()
+
+    def _download_thread(self, voice_id, label):
+        success = self.piper_engine.download_voice(voice_id)
+        if success and self.winfo_exists():
+            self.after(0, lambda: self._on_download_success(label))
+        elif self.winfo_exists():
+            self.after(0, lambda: self.btn_download.configure(state="normal", text="Error. Reintentar"))
+
+    def _on_download_success(self, label):
+        self.btn_download.configure(state="normal", text="Descargar Voz Seleccionada")
+        self.status_label.configure(text=f"¡{label} lista!", text_color="green")
+        self.local_voices_option.configure(values=self._get_local_voices_list())
+        if hasattr(self.parent, "update_voice_options"):
+            self.parent.update_voice_options()
+
     def _start_kokoro_download(self):
-        self.btn_kokoro.configure(state="disabled", text="Descargando Kokoro...")
+        self.btn_download.configure(state="disabled", text="Descargando Kokoro...")
+        self.status_label.configure(text="Bajando Motor Premium (80MB)...", text_color="#3498db")
         threading.Thread(target=self._kokoro_download_thread, daemon=True).start()
 
     def _kokoro_download_thread(self):
@@ -282,12 +305,28 @@ class SettingsWindow(ctk.CTkToplevel):
         if success and self.winfo_exists():
             self.after(0, self._safe_on_kokoro_success)
         elif self.winfo_exists():
-            self.after(0, lambda: self.btn_kokoro.configure(state="normal", text="Error. Reintentar descarga"))
+            self.after(0, lambda: self.btn_download.configure(state="normal", text="Error. Reintentar Kokoro"))
 
     def _safe_on_kokoro_success(self):
-        """Actualización segura tras descargar Kokoro."""
         if self.winfo_exists():
-            self.btn_kokoro.configure(text="Kokoro Instalada", fg_color="green")
+            self.btn_download.configure(text="Descargar Voz Seleccionada", state="normal")
+            self.status_label.configure(text="¡Kokoro Premium instalado!", text_color="green")
+            # Actualizar listas
             self.local_voices_option.configure(values=self._get_local_voices_list())
+            # Quitar Kokoro de la lista de descargas
+            cached_voices = self.piper_engine.get_cached_voices_if_any()
+            if cached_voices:
+                self._build_available_labels(cached_voices)
+                self.download_option.configure(values=self.available_voices_labels)
+                self.download_option.set(self.available_voices_labels[0])
+            
             if hasattr(self.parent, "update_voice_options"):
                 self.parent.update_voice_options()
+
+    def _get_local_voices_list(self):
+        # Listar voces de Piper con prefijo
+        piper_v = [f"[Piper] {v}" for v in self.piper_engine.list_local_voices()]
+        # Añadir Kokoro con prefijo Premium si está instalada
+        if self.kokoro_engine.is_installed():
+            piper_v.append("[Premium] Kokoro")
+        return piper_v if piper_v else ["Ninguna descargada"]
