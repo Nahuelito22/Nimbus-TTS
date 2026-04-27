@@ -14,9 +14,9 @@ class KokoroEngine:
             self.models_dir = os.path.join(models_dir, "kokoro")
             
         os.makedirs(self.models_dir, exist_ok=True)
-        self.model_name = "kokoro-v0_19.onnx"
+        self.model_name = "model.onnx"
         self.voices_name = "voices.json"
-        self.repo_id = "hexgrad/Kokoro-82M"
+        self.repo_id = "onnx-community/Kokoro-82M-ONNX"
         self._voice = None
 
     def is_installed(self):
@@ -31,15 +31,13 @@ class KokoroEngine:
             hf_hub_download(
                 repo_id=self.repo_id,
                 filename=self.model_name,
-                local_dir=self.models_dir,
-                local_dir_use_symlinks=False
+                local_dir=self.models_dir
             )
             # Descargar Voices
             hf_hub_download(
                 repo_id=self.repo_id,
                 filename=self.voices_name,
-                local_dir=self.models_dir,
-                local_dir_use_symlinks=False
+                local_dir=self.models_dir
             )
             return True
         except Exception as e:
