@@ -88,14 +88,15 @@ class SettingsWindow(ctk.CTkToplevel):
         
         ctk.CTkLabel(tab, text=info_text, wraplength=450, justify="left", text_color="gray").grid(row=1, column=0, padx=padx, pady=(0, 15), sticky="w")
         
-        # Voces disponibles para descargar
-        self.available_voices = self.piper_engine.get_available_spanish_voices()
-        if not self.available_voices:
-            self.available_voices = ["Error cargando catálogo"]
-            
+        # Voces disponibles para descargar (Carga asíncrona)
+        self.available_voices = ["Cargando catálogo..."]
+        
         ctk.CTkLabel(tab, text="Descargar nueva voz:").grid(row=2, column=0, padx=padx, pady=(5, 0), sticky="w")
         self.download_option = ctk.CTkOptionMenu(tab, values=self.available_voices)
         self.download_option.grid(row=3, column=0, padx=padx, pady=pady, sticky="ew")
+        
+        # Lanzar hilo para cargar voces
+        threading.Thread(target=self._load_remote_voices, daemon=True).start()
         
         self.btn_download = ctk.CTkButton(tab, text="Descargar de Hugging Face", command=self._start_download)
         self.btn_download.grid(row=4, column=0, padx=padx, pady=5, sticky="ew")
@@ -217,3 +218,16 @@ class SettingsWindow(ctk.CTkToplevel):
         self.config_manager.save_config()
         self.hotkey_manager.update_hotkeys(self.pp_entry.get().strip().lower(), self.stop_entry.get().strip().lower())
         self.destroy()
+    def _load_remote_voices(self):
+        """Carga el catálogo de voces desde Hugging Face en segundo plano."""
+        try:
+            voices = self.piper_engine.get_available_spanish_voices()
+            if voices:
+                self.available_voices = voices
+                self.after(0, lambda: self.download_option.configure(values=self.available_voices))
+                self.after(0, lambda: self.download_option.set(self.available_voices[0]))
+            else:
+                self.after(0, lambda: self.download_option.configure(values=["Error al cargar catálogo"]))
+        except Exception as e:
+            print(f"Error cargando voces remotas: {e}")
+            self.after(0, lambda: self.download_option.configure(values=["Error de conexión"]))

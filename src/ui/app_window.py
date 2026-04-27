@@ -459,10 +459,8 @@ class NimbusApp(ctk.CTk, TkinterDnD.DnDWrapper):
         try:
             menu = pystray.Menu(
                 pystray.MenuItem("Mostrar Nimbus", self.show_window, default=True),
-                pystray.Menu.Separator(),
                 pystray.MenuItem("Reproducir/Pausar", self.toggle_pause),
                 pystray.MenuItem("Detener", self.stop_reading),
-                pystray.Menu.Separator(),
                 pystray.MenuItem("Salir", self.quit_app)
             )
             
