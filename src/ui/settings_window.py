@@ -14,7 +14,14 @@ class SettingsWindow(ctk.CTkToplevel):
         
         # Mapeo de labels a IDs para el catálogo
         self.voice_label_to_id = {}
-        self.available_voices_labels = ["Cargando catálogo..."]
+        
+        # Intentar carga inmediata si ya está en caché
+        cached_voices = self.piper_engine.get_available_spanish_voices()
+        if cached_voices:
+            self.voice_label_to_id = {v["label"]: v["id"] for v in cached_voices}
+            self.available_voices_labels = list(self.voice_label_to_id.keys())
+        else:
+            self.available_voices_labels = ["Cargando catálogo..."]
         
         self.title("Configuracion de Nimbus-TTS")
         self.geometry("500x650")
@@ -240,21 +247,31 @@ class SettingsWindow(ctk.CTkToplevel):
         self.hotkey_manager.update_hotkeys(self.pp_entry.get().strip().lower(), self.stop_entry.get().strip().lower())
         self.destroy()
     def _load_remote_voices(self):
-        """Carga el catálogo de voces desde Hugging Face en segundo plano."""
+        """Carga el catálogo de voces en segundo plano (si no estaba en caché)."""
+        # Si ya cargamos las voces en el __init__ (desde caché), no hace falta re-descargar
+        if self.voice_label_to_id:
+            return
+
         try:
             voices_data = self.piper_engine.get_available_spanish_voices()
-            if voices_data:
+            if voices_data and self.winfo_exists():
                 # Limpiar y llenar mapeo
                 self.voice_label_to_id = {v["label"]: v["id"] for v in voices_data}
                 self.available_voices_labels = list(self.voice_label_to_id.keys())
                 
-                self.after(0, lambda: self.download_option.configure(values=self.available_voices_labels))
-                self.after(0, lambda: self.download_option.set(self.available_voices_labels[0]))
-            else:
+                self.after(0, self._safe_update_catalog)
+            elif self.winfo_exists():
                 self.after(0, lambda: self.download_option.configure(values=["Error al cargar catálogo"]))
         except Exception as e:
             print(f"Error cargando voces remotas: {e}")
-            self.after(0, lambda: self.download_option.configure(values=["Error de conexión"]))
+            if self.winfo_exists():
+                self.after(0, lambda: self.download_option.configure(values=["Error de conexión"]))
+
+    def _safe_update_catalog(self):
+        """Actualización segura de la UI."""
+        if self.winfo_exists():
+            self.download_option.configure(values=self.available_voices_labels)
+            self.download_option.set(self.available_voices_labels[0])
 
     def _start_kokoro_download(self):
         self.btn_kokoro.configure(state="disabled", text="Descargando Kokoro...")
@@ -262,11 +279,15 @@ class SettingsWindow(ctk.CTkToplevel):
 
     def _kokoro_download_thread(self):
         success = self.kokoro_engine.download_model()
-        if success:
-            self.after(0, lambda: self.btn_kokoro.configure(text="Kokoro Instalada", fg_color="green"))
-            self.after(0, lambda: self.local_voices_option.configure(values=self._get_local_voices_list()))
-            # Intentar actualizar UI principal si existe el método
-            if hasattr(self.parent, "update_voice_options"):
-                self.after(0, self.parent.update_voice_options)
-        else:
+        if success and self.winfo_exists():
+            self.after(0, self._safe_on_kokoro_success)
+        elif self.winfo_exists():
             self.after(0, lambda: self.btn_kokoro.configure(state="normal", text="Error. Reintentar descarga"))
+
+    def _safe_on_kokoro_success(self):
+        """Actualización segura tras descargar Kokoro."""
+        if self.winfo_exists():
+            self.btn_kokoro.configure(text="Kokoro Instalada", fg_color="green")
+            self.local_voices_option.configure(values=self._get_local_voices_list())
+            if hasattr(self.parent, "update_voice_options"):
+                self.parent.update_voice_options()

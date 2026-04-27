@@ -35,4 +35,4 @@ Este documento sirve para el seguimiento del desarrollo de Nimbus-TTS.
 - [x] Tarea 6.3 - Resúmenes con IA: Integración de IA para resumir textos largos.
 - [x] Tarea 6.4 - System Tray: Minimizar la app a la bandeja del sistema.
 - [x] Tarea 6.5 - Historial: Lista de archivos PDF abiertos recientemente.
-- [ ] Tarea 6.6 - Gestor de Voces (Hugging Face): Descarga y uso de modelos locales Piper.
+- [x] Tarea 6.6 - Gestor de Voces (Hugging Face): Descarga y uso de modelos locales Piper y Kokoro Premium.
