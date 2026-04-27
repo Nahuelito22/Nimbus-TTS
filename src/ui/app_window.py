@@ -224,8 +224,8 @@ class NimbusApp(ctk.CTk):
             except queue.Empty:
                 break
                 
-        # Limpieza de archivos temporales (opcional, en un hilo pequeo para evitar demoras)
-        threading.Thread(target=self._cleanup_temp_files, daemon=True).start()
+        # Limpieza de archivos temporales
+        self._cleanup_temp_files()
 
     def _cleanup_temp_files(self):
         """Intenta borrar los archivos temporales actuales."""
@@ -264,8 +264,17 @@ class NimbusApp(ctk.CTk):
 
     def destroy(self):
         """Sobrescribimos destroy para limpiar hotkeys y archivos."""
+        print("Cerrando Nimbus-TTS y limpiando temporales...")
         self.stop_reading()
         self.hotkey_manager.stop_listening()
+        
+        # Intento final de borrar toda la carpeta temp
+        try:
+            if os.path.exists(self.temp_dir):
+                shutil.rmtree(self.temp_dir, ignore_errors=True)
+        except Exception:
+            pass
+            
         super().destroy()
 
 if __name__ == "__main__":
