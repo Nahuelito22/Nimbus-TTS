@@ -9,6 +9,7 @@ class TextManager:
     def clean_text(text):
         """
         Limpia el texto de saltos de lnea innecesarios, guiones de divisin de palabras y espacios extra.
+        Tambin corrige palabras fragmentadas por el extractor de PDF (ej: "q ue" -> "que").
         """
         # 1. Quitar guiones de final de lnea (ej: "excep- \n cional" -> "excepcional")
         text = re.sub(r'-\s*\n\s*', '', text)
@@ -17,12 +18,33 @@ class TextManager:
         # pero mantenemos los saltos dobles para prrafos.
         text = re.sub(r'(?<!\n)\n(?!\n)', ' ', text)
         
-        # 3. Corregir palabras comunes que suelen quedar mal separadas en PDFs (heurstica simple)
-        # Unimos letras sueltas que forman palabras comunes
-        text = re.sub(r'\b(q|Q)\s+(u|U)\s+(e|E)\b', r'\1\2\3', text)
-        text = re.sub(r'\b(l|L)\s+(a|A)\s+(s|S)\b', r'\1\2\3', text)
-        text = re.sub(r'\b(l|L)\s+(o|O)\s+(s|S)\b', r'\1\2\3', text)
-        text = re.sub(r'\b(c|C)\s+(o|O)\s+(n|N)\b', r'\1\2\3', text)
+        # 3. Corregir palabras fragmentadas comunes (Heurstica avanzada)
+        # Lista de palabras comunes en espaol que suelen romperse en PDFs
+        palabras_comunes = [
+            "que", "para", "entre", "esta", "estas", "este", "estos", "con", "como", 
+            "pero", "todo", "toda", "figura", "medio", "donde", "cuando", "forma",
+            "desde", "hacia", "sobre", "entre", "mismo", "misma", "sistema", "archivos"
+        ]
+        
+        for word in palabras_comunes:
+            # Caso: "q ue" (primera letra separada)
+            pattern1 = fr'\b{word[0]}\s+{word[1:]}\b'
+            text = re.sub(pattern1, word, text, flags=re.IGNORECASE)
+            
+            # Caso: "qu e" (ltima letra separada)
+            pattern2 = fr'\b{word[:-1]}\s+{word[-1]}\b'
+            text = re.sub(pattern2, word, text, flags=re.IGNORECASE)
+            
+            # Caso: "p a r a" (letras explotadas - solo para palabras cortas)
+            if len(word) <= 5:
+                exploded = r"\s+".join(list(word))
+                text = re.sub(fr'\b{exploded}\b', word, text, flags=re.IGNORECASE)
+
+        # Correcciones especficas de la imagen (ej: "m  s", "f or ma")
+        text = re.sub(r'\b(m|M)\s+(á|Á)\s+(s|S)\b', r'\1\2\3', text)
+        text = re.sub(r'\b(f|F)\s+or\s+ma\b', r'\1orma', text)
+        text = re.sub(r'\b(a|A)\s+bstracción\b', r'\1bstracción', text)
+        text = re.sub(r'\b(a|A)\s+rchivo\b', r'\1rchivo', text)
         
         # 4. Eliminar mltiples espacios en blanco
         text = re.sub(r'[ \t]+', ' ', text)
