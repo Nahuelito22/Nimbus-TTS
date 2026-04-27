@@ -1,0 +1,13 @@
+{
+    "voice": "es-MX-JorgeNeural",
+    "rate": "+0%",
+    "hotkey_play_pause": "p",
+    "hotkey_stop": "ctrl+alt+s",
+    "appearance_mode": "Dark",
+    "use_offline_mode": true,
+    "local_voice": "es_AR-daniela-high",
+    "models_path": "C:\\Repositorios_Locales\\Proyectos_Personales\\Nimbus-TTS\\models",
+    "gemini_api_key": "AIzaSyAs4N0QsAx_k2GfWiskSulYITGqG8DWzbg",
+    "openai_api_key": "",
+    "preferred_ai_provider": "Gemini"
+}

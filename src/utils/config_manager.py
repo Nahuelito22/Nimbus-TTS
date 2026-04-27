@@ -12,7 +12,13 @@ class ConfigManager:
             "rate": "0%",
             "hotkey_play_pause": "ctrl+alt+p",
             "hotkey_stop": "ctrl+alt+s",
-            "appearance_mode": "Dark"
+            "appearance_mode": "Dark",
+            "use_offline_mode": False,
+            "local_voice": "",
+            "models_path": os.path.join(os.getcwd(), "models"),
+            "gemini_api_key": "",
+            "openai_api_key": "",
+            "preferred_ai_provider": "Gemini"
         }
         self.config = self.load_config()
 

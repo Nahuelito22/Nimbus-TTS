@@ -1,5 +1,5 @@
 import customtkinter as ctk
-from tkinter import filedialog
+from tkinter import filedialog, messagebox
 import os
 import asyncio
 import threading
@@ -12,16 +12,22 @@ from src.core.pdf_parser import extract_text_from_pdf
 from src.core.text_manager import TextManager
 from src.core.tts_engine import TTSEngine
 from src.core.audio_player import AudioPlayer
+from src.core.piper_engine import PiperEngine
+from src.core.ai_manager import AIManager
 from src.utils.hotkeys import HotkeyManager
 from src.utils.config_manager import ConfigManager
 from src.ui.settings_window import SettingsWindow
+from tkinterdnd2 import TkinterDnD, DND_FILES
 
 ctk.set_appearance_mode("Dark") # Fallback inicial
 ctk.set_default_color_theme("blue")
 
-class NimbusApp(ctk.CTk):
+class NimbusApp(ctk.CTk, TkinterDnD.DnDWrapper):
     def __init__(self):
         super().__init__()
+        
+        # Inicializar soporte para Drag & Drop
+        self.TkdndVersion = TkinterDnD._require(self)
 
         self.title("Nimbus-TTS - Estudio Inteligente")
         self.geometry("900x600")
@@ -36,10 +42,17 @@ class NimbusApp(ctk.CTk):
 
         # Inicializar componentes lógicos
         self.audio_player = AudioPlayer()
+        self.piper_engine = PiperEngine(models_dir=self.config_manager.get("models_path"))
+        self.ai_manager = AIManager(self.config_manager)
         self.tts_engine = TTSEngine(
             voice=self.config_manager.get("voice"),
             rate=self.config_manager.get("rate")
         )
+
+        # Estados de texto
+        self.original_text = ""
+        self.summary_text = ""
+        self.current_view = "Original" # "Original" o "Resumen"
         self.text_manager = TextManager()
         
         # Variables de control de reproduccin por fragmentos
@@ -72,13 +85,32 @@ class NimbusApp(ctk.CTk):
         self.logo_label = ctk.CTkLabel(self.sidebar_frame, text="Nimbus-TTS", font=ctk.CTkFont(size=20, weight="bold"))
         self.logo_label.pack(padx=20, pady=20)
 
-        # Seleccin de Voz
-        self.voice_label = ctk.CTkLabel(self.sidebar_frame, text="Seleccionar Voz:")
+        # Selector de Modo (Nube / Local)
+        self.mode_label = ctk.CTkLabel(self.sidebar_frame, text="Modo de Motor:")
+        self.mode_label.pack(padx=20, pady=(10, 0))
+        
+        self.mode_switch = ctk.CTkSegmentedButton(self.sidebar_frame, values=["Nube", "Local"], command=self.change_engine_mode)
+        initial_mode = "Local" if self.config_manager.get("use_offline_mode") else "Nube"
+        self.mode_switch.set(initial_mode)
+        self.mode_switch.pack(padx=20, pady=5, fill="x")
+
+        # Selector de Voz
+        self.voice_label = ctk.CTkLabel(self.sidebar_frame, text="Voz:")
         self.voice_label.pack(padx=20, pady=(10, 0))
         
-        self.voice_option = ctk.CTkOptionMenu(self.sidebar_frame, values=self.tts_engine.list_voices(), command=self.change_voice)
-        self.voice_option.set(self.config_manager.get("voice"))
-        self.voice_option.pack(padx=20, pady=10)
+        self.voice_option = ctk.CTkOptionMenu(self.sidebar_frame, values=self._get_voices_for_mode(initial_mode), command=self.change_voice)
+        
+        # Restaurar la voz guardada
+        if initial_mode == "Local":
+            saved_local = self.config_manager.get("local_voice")
+            if saved_local in self._get_voices_for_mode("Local"):
+                self.voice_option.set(saved_local)
+        else:
+            saved_voice = self.config_manager.get("voice")
+            if saved_voice in self._get_voices_for_mode("Nube"):
+                self.voice_option.set(saved_voice)
+                
+        self.voice_option.pack(padx=20, pady=10, fill="x")
 
         # Velocidad
         self.speed_label = ctk.CTkLabel(self.sidebar_frame, text="Velocidad:")
@@ -96,15 +128,15 @@ class NimbusApp(ctk.CTk):
         self.sidebar_spacer = ctk.CTkLabel(self.sidebar_frame, text="")
         self.sidebar_spacer.pack(expand=True, fill="both")
 
-        # Botn de Configuracin
-        self.settings_button = ctk.CTkButton(self.sidebar_frame, text="Configuracin", command=self.open_settings, fg_color="gray25", hover_color="gray35")
+        # Botón de Configuración
+        self.settings_button = ctk.CTkButton(self.sidebar_frame, text="Configuracion", command=self.open_settings, fg_color="gray25", hover_color="gray35")
         self.settings_button.pack(padx=20, pady=20)
 
         # --- MAIN CONTENT ---
         self.main_frame = ctk.CTkFrame(self, corner_radius=0)
         self.main_frame.grid(row=0, column=1, sticky="nsew", padx=10, pady=10)
         self.main_frame.grid_columnconfigure(0, weight=1)
-        self.main_frame.grid_rowconfigure(1, weight=1)
+        self.main_frame.grid_rowconfigure(2, weight=1) # Fila para el textbox
 
         # Top Bar: Carga de Archivos
         self.top_bar = ctk.CTkFrame(self.main_frame, fg_color="transparent")
@@ -113,9 +145,21 @@ class NimbusApp(ctk.CTk):
         self.load_button = ctk.CTkButton(self.top_bar, text="Subir PDF", command=self.load_pdf)
         self.load_button.pack(side="left", padx=5)
 
-        # Middle: TextBox
+        self.summary_btn = ctk.CTkButton(self.top_bar, text="Resumen IA", command=self.generate_ai_summary, fg_color="#7d56f5", hover_color="#6344c7")
+        self.summary_btn.pack(side="left", padx=5)
+
+        # Fila 1: Selector de Vista (Oculto hasta que haya texto)
+        self.view_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        self.view_frame.grid(row=1, column=0, sticky="ew", pady=(0, 5))
+        
+        self.view_selector = ctk.CTkSegmentedButton(self.view_frame, values=["Texto Original", "Resumen IA"], command=self._switch_view)
+        self.view_selector.set("Texto Original")
+        self.view_selector.pack(side="left", padx=5)
+        self.view_frame.grid_remove() # Ocultar inicialmente
+
+        # Fila 2: TextBox
         self.textbox = ctk.CTkTextbox(self.main_frame, font=("Inter", 13))
-        self.textbox.grid(row=1, column=0, sticky="nsew")
+        self.textbox.grid(row=2, column=0, sticky="nsew")
         self.textbox.insert("0.0", "Pega tu texto aqu o sube un PDF...")
         
         # Configurar tag de resaltado
@@ -123,7 +167,7 @@ class NimbusApp(ctk.CTk):
 
         # Bottom Bar: Controles de Audio
         self.controls_bar = ctk.CTkFrame(self.main_frame, height=80)
-        self.controls_bar.grid(row=2, column=0, sticky="ew", pady=(10, 0))
+        self.controls_bar.grid(row=3, column=0, sticky="ew", pady=(10, 0))
         
         self.play_button = ctk.CTkButton(self.controls_bar, text="Reproducir", command=self.start_reading)
         self.play_button.pack(side="left", padx=10, pady=10)
@@ -134,15 +178,80 @@ class NimbusApp(ctk.CTk):
         self.stop_button = ctk.CTkButton(self.controls_bar, text="Detener", command=self.stop_reading, fg_color="red", hover_color="#b30000")
         self.stop_button.pack(side="left", padx=10, pady=10)
 
+        # Configurar Drag & Drop en toda la ventana o solo en el textbox
+        self.drop_target_register(DND_FILES)
+        self.dnd_bind('<<Drop>>', self.handle_drop)
+
     # --- LGICA DE LA UI ---
 
     def load_pdf(self):
-        file_path = filedialog.askopenfilename(filetypes=[("PDF Files", "*.pdf")])
+        file_path = filedialog.askopenfilename(filetypes=[("PDF files", "*.pdf")])
         if file_path:
-            text = extract_text_from_pdf(file_path)
-            clean_text = self.text_manager.clean_text(text)
-            self.textbox.delete("0.0", "end")
-            self.textbox.insert("0.0", clean_text)
+            self._process_file(file_path)
+            
+    def _update_textbox(self, text):
+        self.textbox.delete("0.0", "end")
+        self.textbox.insert("0.0", text)
+
+    def _switch_view(self, view_name):
+        self.stop_reading()
+        if view_name == "Texto Original":
+            self.current_view = "Original"
+            self._update_textbox(self.original_text)
+        else:
+            self.current_view = "Resumen"
+            if self.summary_text:
+                self._update_textbox(self.summary_text)
+            else:
+                self._update_textbox("No hay resumen generado todavía. Pulsa 'Resumen IA'.")
+
+    def generate_ai_summary(self):
+        text_to_summarize = self.original_text or self.textbox.get("0.0", "end").strip()
+        if not text_to_summarize or len(text_to_summarize) < 50:
+            print("Texto demasiado corto para resumir.")
+            return
+
+        def _thread_logic():
+            self.summary_btn.configure(state="disabled", text="Generando...")
+            resumen, modelo = self.ai_manager.summarize(text_to_summarize)
+            
+            if resumen:
+                self.summary_text = f"--- RESUMEN GENERADO POR {modelo.upper()} ---\n\n{resumen}"
+                self.current_view = "Resumen"
+                self.after(0, lambda: self.view_selector.set("Resumen IA"))
+                self.after(0, lambda: self._update_textbox(self.summary_text))
+                self.after(0, lambda: self.view_frame.grid())
+            else:
+                self.after(0, lambda: messagebox.showerror("Error de IA", "No se pudo generar el resumen. Verifica tus API Keys en Ajustes."))
+            
+            self.after(0, lambda: self.summary_btn.configure(state="normal", text="Resumen IA"))
+
+        threading.Thread(target=_thread_logic, daemon=True).start()
+
+    def handle_drop(self, event):
+        """Maneja el evento de soltar un archivo en la ventana."""
+        file_path = event.data
+        
+        # En Windows, las rutas con espacios vienen encerradas en {}
+        if file_path.startswith('{') and file_path.endswith('}'):
+            file_path = file_path[1:-1]
+        
+        if file_path.lower().endswith(".pdf"):
+            self._process_file(file_path)
+        else:
+            print("Archivo no soportado (solo PDF)")
+
+    def _process_file(self, file_path):
+        """Procesa y carga el texto de un archivo PDF."""
+        raw_text = extract_text_from_pdf(file_path)
+        clean_text = self.text_manager.clean_text(raw_text)
+        
+        self.original_text = clean_text
+        self.summary_text = ""
+        self.current_view = "Original"
+        self.view_selector.set("Texto Original")
+        self.view_frame.grid()
+        self._update_textbox(clean_text)
 
     def start_reading(self):
         text = self.textbox.get("0.0", "end").strip()
@@ -158,7 +267,11 @@ class NimbusApp(ctk.CTk):
         self.textbox.tag_remove("highlight", "1.0", "end")
         
         # Tomar valores actuales
-        self.tts_engine.voice = self.voice_option.get()
+        # Actualizamos desde la configuracin del manager para asegurar consistencia
+        is_offline = self.config_manager.get("use_offline_mode")
+        if not is_offline:
+            self.tts_engine.voice = self.config_manager.get("voice")
+            
         speed_val = int(self.speed_slider.get())
         self.tts_engine.rate = f"{'+' if speed_val >= 0 else ''}{speed_val}%"
 
@@ -178,11 +291,19 @@ class NimbusApp(ctk.CTk):
             if self.stop_event.is_set():
                 break
                 
-            temp_file = os.path.join(self.temp_dir, f"temp_chunk_{i}.mp3")
+            ext = ".wav" if self.config_manager.get("use_offline_mode") else ".mp3"
+            temp_file = os.path.join(self.temp_dir, f"temp_chunk_{i}{ext}")
             self.current_temp_files.append(temp_file)
             
-            # Generar audio
-            success = loop.run_until_complete(self.tts_engine.generate_audio(chunk['text'], temp_file))
+            # Generar audio (Online u Offline) basado en la selección actual
+            if self.config_manager.get("use_offline_mode"):
+                local_voice_id = self.config_manager.get("local_voice")
+                success = self.piper_engine.generate_audio(chunk['text'], temp_file, local_voice_id)
+                if not success:
+                    print(f"Error: Falló la síntesis con la voz local {local_voice_id}.")
+            else:
+                success = loop.run_until_complete(self.tts_engine.generate_audio(chunk['text'], temp_file))
+                
             if success and not self.stop_event.is_set():
                 self.audio_queue.put((temp_file, chunk['start'], chunk['end']))
 
@@ -272,8 +393,45 @@ class NimbusApp(ctk.CTk):
 
     # --- CONFIGURACIN ---
     
-    def change_voice(self, voice):
-        self.config_manager.set("voice", voice)
+    def _get_voices_for_mode(self, mode):
+        """Devuelve las voces correspondientes al modo seleccionado."""
+        if mode == "Local":
+            voices = self.piper_engine.list_local_voices()
+            return voices if voices else ["Sin voces descargadas"]
+        else:
+            return self.tts_engine.list_voices()
+
+    def change_engine_mode(self, mode):
+        """Cambia entre el motor de la nube y el motor local."""
+        is_offline = (mode == "Local")
+        self.config_manager.set("use_offline_mode", is_offline)
+        
+        # Actualizar lista de voces
+        new_values = self._get_voices_for_mode(mode)
+        self.voice_option.configure(values=new_values)
+        
+        # Seleccionar la voz guardada para ese modo
+        if is_offline:
+            saved_local = self.config_manager.get("local_voice")
+            if saved_local in new_values:
+                self.voice_option.set(saved_local)
+            else:
+                self.voice_option.set(new_values[0])
+        else:
+            saved_voice = self.config_manager.get("voice")
+            if saved_voice in new_values:
+                self.voice_option.set(saved_voice)
+            else:
+                self.voice_option.set(new_values[0])
+            self.tts_engine.voice = self.voice_option.get()
+
+    def change_voice(self, new_voice):
+        if self.mode_switch.get() == "Local":
+            if new_voice != "Sin voces descargadas":
+                self.config_manager.set("local_voice", new_voice)
+        else:
+            self.config_manager.set("voice", new_voice)
+            self.tts_engine.voice = new_voice
 
     def change_speed(self, speed):
         rate = f"{'+' if int(speed) >= 0 else ''}{int(speed)}%"

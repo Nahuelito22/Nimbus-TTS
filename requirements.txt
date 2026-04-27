@@ -1,5 +1,9 @@
-customtkinter==5.2.2
-edge-tts==7.2.8
-pygame==2.6.1
-keyboard==0.13.5
-PyMuPDF==1.27.2.3
+customtkinter
+pygame
+edge-tts
+keyboard
+pypdf
+tkinterdnd2
+huggingface_hub
+piper-tts
+requests

@@ -219,3 +219,7 @@ __marimo__/
 
 # Archivos de ayuda para el agente
 ayudas_y_recursos/
+
+# Modelos de voz y caché
+models/
+.cache/

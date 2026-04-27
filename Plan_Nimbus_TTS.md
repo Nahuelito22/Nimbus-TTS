@@ -30,8 +30,9 @@ Este documento sirve para el seguimiento del desarrollo de Nimbus-TTS.
 - [ ] Tarea 5.2 - GitHub Actions: Crear workflow de CI/CD para release automático.
 
 ## Épica 6: Funcionalidades Premium y UX
-- [ ] Tarea 6.1 - Focus Mode: Resaltado visual del texto mientras se lee.
-- [ ] Tarea 6.2 - Drag & Drop: Soporte para arrastrar archivos PDF a la app.
-- [ ] Tarea 6.3 - Resúmenes con IA: Integración de IA para resumir textos largos.
+- [x] Tarea 6.1 - Focus Mode: Resaltado visual del texto mientras se lee.
+- [x] Tarea 6.2 - Drag & Drop: Soporte para arrastrar archivos PDF a la app.
+- [x] Tarea 6.3 - Resúmenes con IA: Integración de IA para resumir textos largos.
 - [ ] Tarea 6.4 - System Tray: Minimizar la app a la bandeja del sistema.
 - [ ] Tarea 6.5 - Historial: Lista de archivos PDF abiertos recientemente.
+- [ ] Tarea 6.6 - Gestor de Voces (Hugging Face): Descarga y uso de modelos locales Piper.
