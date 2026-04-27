@@ -24,27 +24,33 @@ class PiperEngine:
         self.models_dir = new_dir
         os.makedirs(self.models_dir, exist_ok=True)
 
-    def get_available_spanish_voices(self):
-        """Descarga el catálogo (o usa la caché local) y devuelve info legible."""
-        try:
-            cache_path = os.path.join(self.models_dir, "voices_cache.json")
-            
-            # 1. Intentar cargar desde memoria
-            if self._voices_metadata:
-                return self._format_voices(self._voices_metadata)
-            
-            # 2. Intentar cargar desde caché local (archivo)
-            if os.path.exists(cache_path):
+    def get_cached_voices_if_any(self):
+        """Busca voces en memoria o disco SIN tocar internet. Ideal para la UI."""
+        cache_path = os.path.join(self.models_dir, "voices_cache.json")
+        if self._voices_metadata:
+            return self._format_voices(self._voices_metadata)
+        if os.path.exists(cache_path):
+            try:
                 with open(cache_path, "r", encoding="utf-8") as f:
                     self._voices_metadata = json.load(f)
                     return self._format_voices(self._voices_metadata)
+            except:
+                pass
+        return None
+
+    def get_available_spanish_voices(self):
+        """Descarga el catálogo (o usa la caché local) y devuelve info legible."""
+        try:
+            # Primero intentar lo rápido
+            cached = self.get_cached_voices_if_any()
+            if cached: return cached
             
-            # 3. Descargar si no hay caché
+            # Si no hay nada, descargar (esto debe ir en un hilo)
             url = "https://huggingface.co/rhasspy/piper-voices/raw/main/voices.json"
             response = requests.get(url, timeout=10)
             if response.status_code == 200:
                 self._voices_metadata = response.json()
-                # Guardar en caché local
+                cache_path = os.path.join(self.models_dir, "voices_cache.json")
                 with open(cache_path, "w", encoding="utf-8") as f:
                     json.dump(self._voices_metadata, f)
                     

@@ -15,8 +15,8 @@ class SettingsWindow(ctk.CTkToplevel):
         # Mapeo de labels a IDs para el catálogo
         self.voice_label_to_id = {}
         
-        # Intentar carga inmediata si ya está en caché
-        cached_voices = self.piper_engine.get_available_spanish_voices()
+        # Intentar carga inmediata SOLO desde caché (rápido, no bloquea)
+        cached_voices = self.piper_engine.get_cached_voices_if_any()
         if cached_voices:
             self.voice_label_to_id = {v["label"]: v["id"] for v in cached_voices}
             self.available_voices_labels = list(self.voice_label_to_id.keys())
