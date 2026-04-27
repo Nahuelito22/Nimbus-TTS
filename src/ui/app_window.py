@@ -5,6 +5,7 @@ import asyncio
 import threading
 import queue
 import time
+import shutil
 
 # Importaciones locales de la capa Core
 from src.core.pdf_parser import extract_text_from_pdf
@@ -28,6 +29,10 @@ class NimbusApp(ctk.CTk):
         # Inicializar gestor de configuracin
         self.config_manager = ConfigManager()
         ctk.set_appearance_mode(self.config_manager.get("appearance_mode"))
+
+        # Configurar carpeta temporal
+        self.temp_dir = os.path.join(os.getcwd(), "temp")
+        self._init_temp_dir()
 
         # Inicializar componentes lógicos
         self.audio_player = AudioPlayer()
@@ -167,7 +172,7 @@ class NimbusApp(ctk.CTk):
             if self.stop_event.is_set():
                 break
                 
-            temp_file = f"temp_chunk_{i}.mp3"
+            temp_file = os.path.join(self.temp_dir, f"temp_chunk_{i}.mp3")
             self.current_temp_files.append(temp_file)
             
             # Generar audio
@@ -223,14 +228,25 @@ class NimbusApp(ctk.CTk):
         threading.Thread(target=self._cleanup_temp_files, daemon=True).start()
 
     def _cleanup_temp_files(self):
+        """Intenta borrar los archivos temporales actuales."""
         time.sleep(0.5) # Dar tiempo a que el player libere el archivo
-        for f in self.current_temp_files:
+        for f in list(self.current_temp_files):
             try:
                 if os.path.exists(f):
                     os.remove(f)
+                    if f in self.current_temp_files:
+                        self.current_temp_files.remove(f)
             except Exception:
                 pass
-        self.current_temp_files.clear()
+
+    def _init_temp_dir(self):
+        """Crea la carpeta temp si no existe y la limpia al iniciar."""
+        try:
+            if os.path.exists(self.temp_dir):
+                shutil.rmtree(self.temp_dir)
+            os.makedirs(self.temp_dir, exist_ok=True)
+        except Exception as e:
+            print(f"Error al inicializar carpeta temporal: {e}")
 
     # --- CONFIGURACIN ---
     
