@@ -454,12 +454,24 @@ class NimbusApp(ctk.CTk, TkinterDnD.DnDWrapper):
     # --- CONFIGURACIN ---
     
     def _get_voices_for_mode(self, mode):
-        """Devuelve las voces correspondientes al modo seleccionado."""
+        """Devuelve las voces correspondientes al modo seleccionado con prefijos claros."""
         if mode == "Local":
-            voices = self.piper_engine.list_local_voices()
+            # Voces de Piper con prefijo
+            voices = [f"[Piper] {v}" for v in self.piper_engine.list_local_voices()]
+            
+            # Añadir Kokoro si está instalado
+            if self.kokoro_engine.is_installed():
+                voices.append("[Premium] Kokoro")
+                
             return voices if voices else ["Sin voces descargadas"]
         else:
             return self.tts_engine.list_voices()
+
+    def update_voice_options(self):
+        """Refresca la lista de voces en la ventana principal (llamado desde Ajustes)."""
+        mode = "Local" if self.config_manager.get("use_offline_mode") else "Nube"
+        new_values = self._get_voices_for_mode(mode)
+        self.voice_option.configure(values=new_values)
 
     def change_engine_mode(self, mode):
         """Cambia entre el motor de la nube y el motor local."""
