@@ -18,6 +18,8 @@ from src.utils.hotkeys import HotkeyManager
 from src.utils.config_manager import ConfigManager
 from src.ui.settings_window import SettingsWindow
 from tkinterdnd2 import TkinterDnD, DND_FILES
+import pystray
+from PIL import Image, ImageDraw
 
 ctk.set_appearance_mode("Dark") # Fallback inicial
 ctk.set_default_color_theme("blue")
@@ -72,6 +74,16 @@ class NimbusApp(ctk.CTk, TkinterDnD.DnDWrapper):
         )
         
         self.setup_ui()
+
+        # Inicializar System Tray
+        self.tray_icon = None
+        self.tray_thread = threading.Thread(target=self.setup_tray, daemon=True)
+        self.tray_thread.start()
+        
+        # Interceptar el cierre de ventana (X)
+        self.protocol("WM_DELETE_WINDOW", self.withdraw_window)
+        
+        print("Nimbus-TTS iniciado correctamente.")
 
     def setup_ui(self):
         # Configurar grid layout (1x2)
@@ -442,9 +454,56 @@ class NimbusApp(ctk.CTk, TkinterDnD.DnDWrapper):
         settings_win = SettingsWindow(self, self.config_manager, self.hotkey_manager)
         settings_win.grab_set() # Hacerla modal (bloquea la principal hasta cerrar)
 
+    def setup_tray(self):
+        """Inicializa el icono de la bandeja del sistema."""
+        try:
+            menu = pystray.Menu(
+                pystray.MenuItem("Mostrar Nimbus", self.show_window, default=True),
+                pystray.Menu.Separator(),
+                pystray.MenuItem("Reproducir/Pausar", self.toggle_pause),
+                pystray.MenuItem("Detener", self.stop_reading),
+                pystray.Menu.Separator(),
+                pystray.MenuItem("Salir", self.quit_app)
+            )
+            
+            icon_img = self._create_tray_icon_image()
+            self.tray_icon = pystray.Icon("nimbus_tts", icon_img, "Nimbus-TTS", menu)
+            self.tray_icon.run()
+        except Exception as e:
+            print(f"Error al iniciar el tray: {e}")
+
+    def _create_tray_icon_image(self):
+        """Crea una imagen simple para el icono del tray."""
+        width = 64
+        height = 64
+        # Fondo oscuro
+        image = Image.new('RGB', (width, height), (30, 30, 30))
+        dc = ImageDraw.Draw(image)
+        # Círculo azul Nimbus
+        dc.ellipse([8, 8, 56, 56], fill=(42, 90, 138))
+        return image
+
+    def withdraw_window(self):
+        """Oculta la ventana principal y la envía al tray."""
+        self.withdraw()
+        
+    def show_window(self, icon=None, item=None):
+        """Muestra la ventana principal."""
+        self.after(0, self.deiconify)
+        self.after(0, self.focus_force)
+
+    def quit_app(self, icon=None, item=None):
+        """Cierra la aplicación completamente."""
+        if self.tray_icon:
+            self.tray_icon.stop()
+        self.after(0, self.destroy)
+
     def destroy(self):
-        """Sobrescribimos destroy para limpiar hotkeys y archivos."""
+        """Sobrescribimos destroy para limpiar hotkeys, archivos y tray."""
         print("Cerrando Nimbus-TTS y limpiando temporales...")
+        if self.tray_icon:
+            self.tray_icon.stop()
+            
         self.stop_reading()
         self.hotkey_manager.stop_listening()
         

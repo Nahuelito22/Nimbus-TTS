@@ -7,3 +7,5 @@ tkinterdnd2
 huggingface_hub
 piper-tts
 requests
+pystray
+Pillow
