@@ -13,6 +13,7 @@ from src.core.text_manager import TextManager
 from src.core.tts_engine import TTSEngine
 from src.core.audio_player import AudioPlayer
 from src.core.piper_engine import PiperEngine
+from src.core.kokoro_engine import KokoroEngine
 from src.core.ai_manager import AIManager
 from src.utils.hotkeys import HotkeyManager
 from src.utils.config_manager import ConfigManager
@@ -50,6 +51,8 @@ class NimbusApp(ctk.CTk, TkinterDnD.DnDWrapper):
             voice=self.config_manager.get("voice"),
             rate=self.config_manager.get("rate")
         )
+        
+        self.kokoro_engine = KokoroEngine(self.config_manager.get("models_path"))
 
         # Estados de texto
         self.original_text = ""
@@ -347,10 +350,17 @@ class NimbusApp(ctk.CTk, TkinterDnD.DnDWrapper):
             
             # Generar audio (Online u Offline) basado en la selección actual
             if self.config_manager.get("use_offline_mode"):
-                local_voice_id = self.config_manager.get("local_voice")
-                success = self.piper_engine.generate_audio(chunk['text'], temp_file, local_voice_id)
+                full_voice_id = self.config_manager.get("local_voice")
+                
+                if "[Premium] Kokoro" in full_voice_id:
+                    success = self.kokoro_engine.generate_audio(chunk['text'], temp_file)
+                else:
+                    # Limpiar el prefijo [Piper] para obtener el ID real del archivo
+                    real_voice_id = full_voice_id.replace("[Piper] ", "")
+                    success = self.piper_engine.generate_audio(chunk['text'], temp_file, real_voice_id)
+                
                 if not success:
-                    print(f"Error: Falló la síntesis con la voz local {local_voice_id}.")
+                    print(f"Error: Falló la síntesis local con {full_voice_id}.")
             else:
                 success = loop.run_until_complete(self.tts_engine.generate_audio(chunk['text'], temp_file))
                 

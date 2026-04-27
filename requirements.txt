@@ -9,3 +9,5 @@ piper-tts
 requests
 pystray
 Pillow
+kokoro-onnx
+soundfile

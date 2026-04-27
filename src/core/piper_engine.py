@@ -24,7 +24,7 @@ class PiperEngine:
         os.makedirs(self.models_dir, exist_ok=True)
 
     def get_available_spanish_voices(self):
-        """Descarga el catlogo y devuelve la lista de voces en espaol."""
+        """Descarga el catálogo y devuelve una lista de diccionarios con info legible."""
         try:
             if not self._voices_metadata:
                 url = "https://huggingface.co/rhasspy/piper-voices/raw/main/voices.json"
@@ -32,11 +32,26 @@ class PiperEngine:
                 if response.status_code == 200:
                     self._voices_metadata = response.json()
             
-            # Filtrar solo espaol
-            es_voices = [k for k, v in self._voices_metadata.items() if v.get("language", {}).get("family") == "es"]
-            return sorted(es_voices)
+            # Filtrar voces en español y formatear info
+            es_voices = []
+            for voice_id, info in self._voices_metadata.items():
+                lang = info.get("language", {})
+                if lang.get("family") == "es":
+                    country = lang.get("region", "ES")
+                    name = info.get("name", voice_id)
+                    quality = info.get("quality", "unknown")
+                    
+                    # Crear un label amigable con prefijo de motor
+                    label = f"[Piper] [{country}] {name.capitalize()} ({quality.capitalize()})"
+                    es_voices.append({
+                        "id": voice_id,
+                        "label": label
+                    })
+            
+            # Ordenar por país y luego por nombre
+            return sorted(es_voices, key=lambda x: x["label"])
         except Exception as e:
-            print(f"Error obteniendo catlogo de voces: {e}")
+            print(f"Error obteniendo catálogo de voces: {e}")
             return []
 
     def list_local_voices(self):
