@@ -6,6 +6,8 @@ import threading
 import queue
 import time
 import shutil
+import sys
+from pathlib import Path
 
 # Importaciones locales de la capa Core
 from src.core.pdf_parser import extract_text_from_pdf
@@ -13,11 +15,14 @@ from src.core.text_manager import TextManager
 from src.core.tts_engine import TTSEngine
 from src.core.audio_player import AudioPlayer
 from src.core.piper_engine import PiperEngine
+from src.core.kokoro_engine import KokoroEngine
 from src.core.ai_manager import AIManager
 from src.utils.hotkeys import HotkeyManager
 from src.utils.config_manager import ConfigManager
 from src.ui.settings_window import SettingsWindow
 from tkinterdnd2 import TkinterDnD, DND_FILES
+import pystray
+from PIL import Image, ImageDraw
 
 ctk.set_appearance_mode("Dark") # Fallback inicial
 ctk.set_default_color_theme("blue")
@@ -48,11 +53,22 @@ class NimbusApp(ctk.CTk, TkinterDnD.DnDWrapper):
             voice=self.config_manager.get("voice"),
             rate=self.config_manager.get("rate")
         )
+        
+        self.kokoro_engine = KokoroEngine(self.config_manager.get("models_path"))
 
         # Estados de texto
         self.original_text = ""
         self.summary_text = ""
         self.current_view = "Original" # "Original" o "Resumen"
+        
+        # Cargar Logo
+        self._set_app_icon()
+
+        # Chequeo de Internet para modo inteligente
+        self._check_internet_and_adjust_mode()
+
+        # UI Inicial
+        self.setup_ui()
         self.text_manager = TextManager()
         
         # Variables de control de reproduccin por fragmentos
@@ -72,6 +88,16 @@ class NimbusApp(ctk.CTk, TkinterDnD.DnDWrapper):
         )
         
         self.setup_ui()
+
+        # Inicializar System Tray
+        self.tray_icon = None
+        self.tray_thread = threading.Thread(target=self.setup_tray, daemon=True)
+        self.tray_thread.start()
+        
+        # Interceptar el cierre de ventana (X)
+        self.protocol("WM_DELETE_WINDOW", self.withdraw_window)
+        
+        print("Nimbus-TTS iniciado correctamente.")
 
     def setup_ui(self):
         # Configurar grid layout (1x2)
@@ -144,6 +170,12 @@ class NimbusApp(ctk.CTk, TkinterDnD.DnDWrapper):
         
         self.load_button = ctk.CTkButton(self.top_bar, text="Subir PDF", command=self.load_pdf)
         self.load_button.pack(side="left", padx=5)
+
+        # Historial de Recientes
+        self.recent_files = self.config_manager.get("recent_files")
+        self.history_menu = ctk.CTkOptionMenu(self.top_bar, values=["Recientes"] + self.recent_files, command=self._load_recent_file)
+        self.history_menu.set("Recientes")
+        self.history_menu.pack(side="left", padx=5)
 
         self.summary_btn = ctk.CTkButton(self.top_bar, text="Resumen IA", command=self.generate_ai_summary, fg_color="#7d56f5", hover_color="#6344c7")
         self.summary_btn.pack(side="left", padx=5)
@@ -252,6 +284,38 @@ class NimbusApp(ctk.CTk, TkinterDnD.DnDWrapper):
         self.view_selector.set("Texto Original")
         self.view_frame.grid()
         self._update_textbox(clean_text)
+        
+        # Actualizar historial
+        self._update_history(file_path)
+
+    def _update_history(self, file_path):
+        """Actualiza la lista de archivos recientes."""
+        history = self.config_manager.get("recent_files") or []
+        if file_path in history:
+            history.remove(file_path)
+        history.insert(0, file_path)
+        history = history[:5] # Guardar últimos 5
+        self.config_manager.set("recent_files", history)
+        
+        # Actualizar menú
+        self.history_menu.configure(values=["Recientes"] + history)
+        self.history_menu.set("Recientes")
+
+    def _load_recent_file(self, file_path):
+        """Carga un archivo desde el historial."""
+        if file_path == "Recientes":
+            return
+            
+        if os.path.exists(file_path):
+            self._process_file(file_path)
+        else:
+            messagebox.showerror("Error", "El archivo ya no existe en esa ubicación.")
+            # Opcional: eliminar del historial
+            history = self.config_manager.get("recent_files")
+            if file_path in history:
+                history.remove(file_path)
+                self.config_manager.set("recent_files", history)
+                self.history_menu.configure(values=["Recientes"] + history)
 
     def start_reading(self):
         text = self.textbox.get("0.0", "end").strip()
@@ -297,10 +361,17 @@ class NimbusApp(ctk.CTk, TkinterDnD.DnDWrapper):
             
             # Generar audio (Online u Offline) basado en la selección actual
             if self.config_manager.get("use_offline_mode"):
-                local_voice_id = self.config_manager.get("local_voice")
-                success = self.piper_engine.generate_audio(chunk['text'], temp_file, local_voice_id)
+                full_voice_id = self.config_manager.get("local_voice")
+                
+                if "[Premium] Kokoro" in full_voice_id:
+                    success = self.kokoro_engine.generate_audio(chunk['text'], temp_file)
+                else:
+                    # Limpiar el prefijo [Piper] para obtener el ID real del archivo
+                    real_voice_id = full_voice_id.replace("[Piper] ", "")
+                    success = self.piper_engine.generate_audio(chunk['text'], temp_file, real_voice_id)
+                
                 if not success:
-                    print(f"Error: Falló la síntesis con la voz local {local_voice_id}.")
+                    print(f"Error: Falló la síntesis local con {full_voice_id}.")
             else:
                 success = loop.run_until_complete(self.tts_engine.generate_audio(chunk['text'], temp_file))
                 
@@ -394,12 +465,24 @@ class NimbusApp(ctk.CTk, TkinterDnD.DnDWrapper):
     # --- CONFIGURACIN ---
     
     def _get_voices_for_mode(self, mode):
-        """Devuelve las voces correspondientes al modo seleccionado."""
+        """Devuelve las voces correspondientes al modo seleccionado con prefijos claros."""
         if mode == "Local":
-            voices = self.piper_engine.list_local_voices()
+            # Voces de Piper con prefijo
+            voices = [f"[Piper] {v}" for v in self.piper_engine.list_local_voices()]
+            
+            # Añadir Kokoro si está instalado
+            if self.kokoro_engine.is_installed():
+                voices.append("[Premium] Kokoro")
+                
             return voices if voices else ["Sin voces descargadas"]
         else:
             return self.tts_engine.list_voices()
+
+    def update_voice_options(self):
+        """Refresca la lista de voces en la ventana principal (llamado desde Ajustes)."""
+        mode = "Local" if self.config_manager.get("use_offline_mode") else "Nube"
+        new_values = self._get_voices_for_mode(mode)
+        self.voice_option.configure(values=new_values)
 
     def change_engine_mode(self, mode):
         """Cambia entre el motor de la nube y el motor local."""
@@ -442,9 +525,88 @@ class NimbusApp(ctk.CTk, TkinterDnD.DnDWrapper):
         settings_win = SettingsWindow(self, self.config_manager, self.hotkey_manager)
         settings_win.grab_set() # Hacerla modal (bloquea la principal hasta cerrar)
 
+    def setup_tray(self):
+        """Inicializa el icono de la bandeja del sistema."""
+        try:
+            menu = pystray.Menu(
+                pystray.MenuItem("Mostrar Nimbus", self.show_window, default=True),
+                pystray.MenuItem("Reproducir/Pausar", self.toggle_pause),
+                pystray.MenuItem("Detener", self.stop_reading),
+                pystray.MenuItem("Salir", self.quit_app)
+            )
+            
+            icon_img = self._create_tray_icon_image()
+            self.tray_icon = pystray.Icon("nimbus_tts", icon_img, "Nimbus-TTS", menu)
+            self.tray_icon.run()
+        except Exception as e:
+            print(f"Error al iniciar el tray: {e}")
+
+    def _create_tray_icon_image(self):
+        """Carga la versión sin texto para la bandeja (mejor visibilidad)."""
+        icon_path = self._get_asset_path("assets/Logo_SinTexto_ReEscalado.png")
+        if os.path.exists(icon_path):
+            try:
+                return Image.open(icon_path)
+            except:
+                pass
+        
+        # Imagen de respaldo
+        width, height = 64, 64
+        image = Image.new('RGB', (width, height), (30, 30, 30))
+        dc = ImageDraw.Draw(image)
+        dc.ellipse([8, 8, 56, 56], fill=(42, 90, 138))
+        return image
+
+    def _check_internet_and_adjust_mode(self):
+        """Detecta si hay internet y ajusta el modo de la app automáticamente."""
+        import socket
+        try:
+            # Intentar conectar a Google DNS
+            socket.create_connection(("8.8.8.8", 53), timeout=2)
+            self.has_internet = True
+        except OSError:
+            self.has_internet = False
+            
+        # Si no hay internet y estábamos en modo nube, forzar local
+        if not self.has_internet:
+            print("Sin conexión a Internet. Activando Modo Local automáticamente.")
+            self.config_manager.set("use_offline_mode", True)
+
+    def _get_asset_path(self, relative_path):
+        """Obtiene la ruta absoluta del recurso, compatible con PyInstaller."""
+        base_path = getattr(sys, '_MEIPASS', os.path.abspath("."))
+        return os.path.join(base_path, relative_path)
+
+    def _set_app_icon(self):
+        """Establece el icono de la ventana principal de forma segura."""
+        icon_path = self._get_asset_path("assets/favicon.ico")
+        if os.path.exists(icon_path):
+            try:
+                self.iconbitmap(icon_path)
+            except:
+                pass
+
+    def withdraw_window(self):
+        """Oculta la ventana principal y la envía al tray."""
+        self.withdraw()
+        
+    def show_window(self, icon=None, item=None):
+        """Muestra la ventana principal."""
+        self.after(0, self.deiconify)
+        self.after(0, self.focus_force)
+
+    def quit_app(self, icon=None, item=None):
+        """Cierra la aplicación completamente."""
+        if self.tray_icon:
+            self.tray_icon.stop()
+        self.after(0, self.destroy)
+
     def destroy(self):
-        """Sobrescribimos destroy para limpiar hotkeys y archivos."""
+        """Sobrescribimos destroy para limpiar hotkeys, archivos y tray."""
         print("Cerrando Nimbus-TTS y limpiando temporales...")
+        if self.tray_icon:
+            self.tray_icon.stop()
+            
         self.stop_reading()
         self.hotkey_manager.stop_listening()
         

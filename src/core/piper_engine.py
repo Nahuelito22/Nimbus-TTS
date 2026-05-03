@@ -1,5 +1,6 @@
 import os
 import requests
+import json
 from huggingface_hub import hf_hub_download
 import threading
 
@@ -23,21 +24,53 @@ class PiperEngine:
         self.models_dir = new_dir
         os.makedirs(self.models_dir, exist_ok=True)
 
+    def get_cached_voices_if_any(self):
+        """Busca voces en memoria o disco SIN tocar internet. Ideal para la UI."""
+        cache_path = os.path.join(self.models_dir, "voices_cache.json")
+        if self._voices_metadata:
+            return self._format_voices(self._voices_metadata)
+        if os.path.exists(cache_path):
+            try:
+                with open(cache_path, "r", encoding="utf-8") as f:
+                    self._voices_metadata = json.load(f)
+                    return self._format_voices(self._voices_metadata)
+            except:
+                pass
+        return None
+
     def get_available_spanish_voices(self):
-        """Descarga el catlogo y devuelve la lista de voces en espaol."""
+        """Descarga el catálogo (o usa la caché local) y devuelve info legible."""
         try:
-            if not self._voices_metadata:
-                url = "https://huggingface.co/rhasspy/piper-voices/raw/main/voices.json"
-                response = requests.get(url, timeout=10)
-                if response.status_code == 200:
-                    self._voices_metadata = response.json()
+            # Primero intentar lo rápido
+            cached = self.get_cached_voices_if_any()
+            if cached: return cached
             
-            # Filtrar solo espaol
-            es_voices = [k for k, v in self._voices_metadata.items() if v.get("language", {}).get("family") == "es"]
-            return sorted(es_voices)
+            # Si no hay nada, descargar (esto debe ir en un hilo)
+            url = "https://huggingface.co/rhasspy/piper-voices/raw/main/voices.json"
+            response = requests.get(url, timeout=10)
+            if response.status_code == 200:
+                self._voices_metadata = response.json()
+                cache_path = os.path.join(self.models_dir, "voices_cache.json")
+                with open(cache_path, "w", encoding="utf-8") as f:
+                    json.dump(self._voices_metadata, f)
+                    
+            return self._format_voices(self._voices_metadata)
         except Exception as e:
-            print(f"Error obteniendo catlogo de voces: {e}")
+            print(f"Error obteniendo catálogo de voces: {e}")
             return []
+
+    def _format_voices(self, metadata):
+        """Helper para formatear las voces del json."""
+        es_voices = []
+        for voice_id, info in metadata.items():
+            lang = info.get("language", {})
+            if lang.get("family") == "es":
+                country = lang.get("region", "ES")
+                name = info.get("name", voice_id)
+                quality = info.get("quality", "unknown")
+                label = f"[Piper] [{country}] {name.capitalize()} ({quality.capitalize()})"
+                es_voices.append({"id": voice_id, "label": label})
+        return sorted(es_voices, key=lambda x: x["label"])
 
     def list_local_voices(self):
         """Lista las voces descargadas en la carpeta models."""
