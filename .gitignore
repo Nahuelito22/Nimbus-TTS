@@ -226,3 +226,6 @@ models/
 
 # Archivos de configuración local (Sensibles)
 config.json
+
+# Archivos temporales de temp
+temp/
