@@ -5,8 +5,15 @@ class ConfigManager:
     """
     Gestiona la carga y guardado de la configuracin de la aplicacin.
     """
-    def __init__(self, config_path="config.json"):
-        self.config_path = config_path
+    def __init__(self, filename="config.json"):
+        # Usar AppData para persistencia profesional
+        app_data_root = os.path.join(os.environ.get('LOCALAPPDATA', os.path.expanduser('~')), "Nimbus-TTS")
+        os.makedirs(app_data_root, exist_ok=True)
+        
+        self.config_path = os.path.join(app_data_root, filename)
+        models_path = os.path.join(app_data_root, "models")
+        os.makedirs(models_path, exist_ok=True)
+
         self.default_config = {
             "voice": "es-ES-AlvaroNeural",
             "rate": "0%",
@@ -15,7 +22,7 @@ class ConfigManager:
             "appearance_mode": "Dark",
             "use_offline_mode": False,
             "local_voice": "",
-            "models_path": os.path.join(os.getcwd(), "models"),
+            "models_path": models_path,
             "gemini_api_key": "",
             "openai_api_key": "",
             "preferred_ai_provider": "Gemini",

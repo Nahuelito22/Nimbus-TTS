@@ -6,6 +6,8 @@ import threading
 import queue
 import time
 import shutil
+import sys
+from pathlib import Path
 
 # Importaciones locales de la capa Core
 from src.core.pdf_parser import extract_text_from_pdf
@@ -58,6 +60,9 @@ class NimbusApp(ctk.CTk, TkinterDnD.DnDWrapper):
         self.original_text = ""
         self.summary_text = ""
         self.current_view = "Original" # "Original" o "Resumen"
+        
+        # Cargar Logo
+        self._set_app_icon()
         self.text_manager = TextManager()
         
         # Variables de control de reproduccin por fragmentos
@@ -531,15 +536,37 @@ class NimbusApp(ctk.CTk, TkinterDnD.DnDWrapper):
             print(f"Error al iniciar el tray: {e}")
 
     def _create_tray_icon_image(self):
-        """Crea una imagen simple para el icono del tray."""
-        width = 64
-        height = 64
-        # Fondo oscuro
+        """Carga la versión sin texto para la bandeja (mejor visibilidad)."""
+        icon_path = self._get_asset_path("assets/Logo_SinTexto_ReEscalado.png")
+        if os.path.exists(icon_path):
+            try:
+                return Image.open(icon_path)
+            except:
+                pass
+        
+        # Imagen de respaldo
+        width, height = 64, 64
         image = Image.new('RGB', (width, height), (30, 30, 30))
         dc = ImageDraw.Draw(image)
-        # Círculo azul Nimbus
         dc.ellipse([8, 8, 56, 56], fill=(42, 90, 138))
         return image
+
+    def _get_asset_path(self, relative_path):
+        """Obtiene la ruta absoluta del recurso, compatible con PyInstaller."""
+        base_path = getattr(sys, '_MEIPASS', os.path.abspath("."))
+        return os.path.join(base_path, relative_path)
+
+    def _set_app_icon(self):
+        """Establece el icono con texto para la ventana principal."""
+        icon_path = self._get_asset_path("assets/Logo_SinSubtitulo.png")
+        if os.path.exists(icon_path):
+            try:
+                img = Image.open(icon_path)
+                from PIL import ImageTk
+                icon = ImageTk.PhotoImage(img)
+                self.wm_iconphoto(True, icon)
+            except Exception as e:
+                print(f"No se pudo cargar el icono: {e}")
 
     def withdraw_window(self):
         """Oculta la ventana principal y la envía al tray."""
