@@ -63,6 +63,12 @@ class NimbusApp(ctk.CTk, TkinterDnD.DnDWrapper):
         
         # Cargar Logo
         self._set_app_icon()
+
+        # Chequeo de Internet para modo inteligente
+        self._check_internet_and_adjust_mode()
+
+        # UI Inicial
+        self.setup_ui()
         self.text_manager = TextManager()
         
         # Variables de control de reproduccin por fragmentos
@@ -551,22 +557,34 @@ class NimbusApp(ctk.CTk, TkinterDnD.DnDWrapper):
         dc.ellipse([8, 8, 56, 56], fill=(42, 90, 138))
         return image
 
+    def _check_internet_and_adjust_mode(self):
+        """Detecta si hay internet y ajusta el modo de la app automáticamente."""
+        import socket
+        try:
+            # Intentar conectar a Google DNS
+            socket.create_connection(("8.8.8.8", 53), timeout=2)
+            self.has_internet = True
+        except OSError:
+            self.has_internet = False
+            
+        # Si no hay internet y estábamos en modo nube, forzar local
+        if not self.has_internet:
+            print("Sin conexión a Internet. Activando Modo Local automáticamente.")
+            self.config_manager.set("use_offline_mode", True)
+
     def _get_asset_path(self, relative_path):
         """Obtiene la ruta absoluta del recurso, compatible con PyInstaller."""
         base_path = getattr(sys, '_MEIPASS', os.path.abspath("."))
         return os.path.join(base_path, relative_path)
 
     def _set_app_icon(self):
-        """Establece el icono con texto para la ventana principal."""
-        icon_path = self._get_asset_path("assets/Logo_SinSubtitulo.png")
+        """Establece el icono de la ventana principal de forma segura."""
+        icon_path = self._get_asset_path("assets/favicon.ico")
         if os.path.exists(icon_path):
             try:
-                img = Image.open(icon_path)
-                from PIL import ImageTk
-                icon = ImageTk.PhotoImage(img)
-                self.wm_iconphoto(True, icon)
-            except Exception as e:
-                print(f"No se pudo cargar el icono: {e}")
+                self.iconbitmap(icon_path)
+            except:
+                pass
 
     def withdraw_window(self):
         """Oculta la ventana principal y la envía al tray."""

@@ -1,6 +1,11 @@
 import customtkinter as ctk
 from src.core.piper_engine import PiperEngine
 import threading
+import os
+import sys
+import webbrowser
+import tkinter as tk
+from PIL import Image, ImageTk
 
 class SettingsWindow(ctk.CTkToplevel):
     def __init__(self, parent, config_manager, hotkey_manager):
@@ -40,13 +45,18 @@ class SettingsWindow(ctk.CTkToplevel):
         self.tabview.grid(row=0, column=0, padx=20, pady=20, sticky="nsew")
         
         self.tab_general = self.tabview.add("General")
-        self.tab_models = self.tabview.add("Voces Locales (HF)")
-        self.tabview.add("Inteligencia Artificial")
+        self.tab_models = self.tabview.add("Modelos")
+        self.tabview.add("IA (Resúmenes)")
+        self.tabview.add("Acerca de")
         self.tabview.set("General")
         
         self._setup_general_tab()
         self._setup_models_tab()
         self._setup_ai_tab()
+        self._setup_about_tab()
+        
+        # Forzar redibujado para evitar pestañas vacías
+        self.update_idletasks()
 
     def _setup_general_tab(self):
         # Usar un Frame desplazable para evitar que se corten los elementos
@@ -128,7 +138,7 @@ class SettingsWindow(ctk.CTkToplevel):
         threading.Thread(target=self._load_remote_voices, daemon=True).start()
 
     def _setup_ai_tab(self):
-        tab = self.tabview.tab("Inteligencia Artificial")
+        tab = self.tabview.tab("IA (Resúmenes)")
         tab.grid_columnconfigure(0, weight=1)
         padx, pady = 20, 10
 
@@ -235,6 +245,11 @@ class SettingsWindow(ctk.CTkToplevel):
         # Guardar y cerrar
         self.config_manager.save_config()
         self.hotkey_manager.update_hotkeys(self.pp_entry.get().strip().lower(), self.stop_entry.get().strip().lower())
+        
+        # Avisar a la ventana principal para que se refresque
+        if hasattr(self.parent, "update_voice_options"):
+            self.parent.update_voice_options()
+            
         self.destroy()
     def _build_available_labels(self, voices_data):
         """Construye la lista de etiquetas incluyendo Kokoro."""
@@ -330,3 +345,33 @@ class SettingsWindow(ctk.CTkToplevel):
         if self.kokoro_engine.is_installed():
             piper_v.append("[Premium] Kokoro")
         return piper_v if piper_v else ["Ninguna descargada"]
+
+    def _setup_about_tab(self):
+        """Configura la pestaña de créditos e información."""
+        tab = self.tabview.tab("Acerca de")
+        
+        # Logo pequeño
+        icon_path = os.path.join(os.path.abspath("."), "assets/Logo_SinTexto_ReEscalado.png")
+        if os.path.exists(icon_path):
+            try:
+                img = Image.open(icon_path)
+                img.thumbnail((100, 100))
+                photo = ImageTk.PhotoImage(img)
+                logo_label = tk.Label(tab, image=photo, bg='#2b2b2b' if ctk.get_appearance_mode() == "Dark" else "#dbdbdb")
+                logo_label.image = photo
+                logo_label.pack(pady=15)
+            except: pass
+
+        ctk.CTkLabel(tab, text="Nimbus-TTS", font=("Arial", 24, "bold")).pack()
+        ctk.CTkLabel(tab, text="Versión 1.0 (Oficial)", font=("Arial", 12)).pack()
+        
+        ctk.CTkLabel(tab, text="\nDesarrollado con ❤️ por:", font=("Arial", 13, "italic")).pack()
+        ctk.CTkLabel(tab, text="Nahuelito22", font=("Arial", 18, "bold"), text_color="#2a5a8a").pack()
+        
+        ctk.CTkLabel(tab, text="\nMotores de Voz: Piper (ONNX) & Kokoro Premium", font=("Arial", 11)).pack()
+        
+        import webbrowser
+        btn_github = ctk.CTkButton(tab, text="Visitar Proyecto en GitHub", 
+                                  command=lambda: webbrowser.open("https://github.com/Nahuelito22/Nimbus-TTS"),
+                                  fg_color="#333333", hover_color="#444444")
+        btn_github.pack(pady=25)
