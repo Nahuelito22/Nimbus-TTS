@@ -1,0 +1,11 @@
+{
+    "api_key_gemini": "TU_API_KEY_AQUI",
+    "api_key_openai": "TU_API_KEY_AQUI",
+    "appearance_mode": "Dark",
+    "default_engine": "Kokoro",
+    "models_path": "models",
+    "output_path": "output",
+    "voice_kokoro": "af_heart",
+    "voice_piper": "es_ES-renee-medium.onnx",
+    "last_tab": "Lectura"
+}
