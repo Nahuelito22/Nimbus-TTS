@@ -1,57 +1,69 @@
-# ☁️ Nimbus-TTS: Voces que te llevan más lejos 🎤
+# Nimbus-TTS
 
-![Nimbus-TTS Logo](assets/Logo_Original.png)
+![Nimbus-TTS](assets/Logo_Original.png)
 
-## 🌟 ¿Qué es Nimbus-TTS?
-**Nimbus-TTS** nace de la necesidad de transformar la forma en que consumimos información. Mientras que herramientas tradicionales como OneNote o lectores básicos ofrecen voces robóticas y dependencia total de la nube, Nimbus-TTS ofrece una **experiencia humana, privada y potente**.
+Una app de escritorio para Windows que lee en voz alta PDFs y apuntes, con voces
+naturales que funcionan sin internet.
 
-Este proyecto fue creado para estudiantes, profesionales y entusiastas de la accesibilidad que buscan una herramienta de lectura que no solo lea texto, sino que lo haga con una calidad premium y herramientas de IA integradas para sintetizar el conocimiento.
+## Por qué existe
 
----
+Leo mucho en PDF: módulos de la facultad, apuntes, documentación. Para escuchar
+en lugar de leer usaba el Lector inmersivo de OneNote, pero quedó bastante
+abandonado: hay que pasar el texto a OneNote, las voces suenan robóticas y
+depende de la nube. Quería algo que abriera el PDF directo y lo leyera bien, así
+que me lo hice.
 
-## ✨ Características Principales
+Es parte de Nimbus, la marca donde junto los proyectos que uso yo mismo.
 
-### 🎙️ Motores de Voz de Próxima Generación
-- **[Premium] Kokoro Engine**: Calidad humana asombrosa en solo 300MB. La excelencia en síntesis de voz local.
-- **[Piper] ONNX Models**: Velocidad y eficiencia. Voces naturales que funcionan 100% offline.
-- **Nube Híbrida**: Soporte para Azure y Google TTS para máxima versatilidad.
+## Qué hace
 
-### 🧠 Inteligencia Artificial Integrada
-- **Resúmenes Inteligentes**: ¿Texto muy largo? Pide un resumen a través de **Google Gemini** u **OpenAI** y escúchalo al instante.
-- **Multimodal**: Preparado para evolucionar hacia el análisis de documentos complejos.
+- **Abre PDFs y texto.** Arrastrás el PDF a la ventana o lo elegís desde el
+  botón, y extrae el texto para leerlo. También se puede pegar texto a mano.
+- **Lee sin internet.** Usa modelos de voz que corren en la propia PC: Kokoro,
+  que suena muy natural, y Piper, más liviano. Las voces se descargan una vez
+  desde Ajustes.
+- **Con internet, suma voces en la nube** (Edge TTS). Si al abrir no hay
+  conexión, pasa sola a las voces locales.
+- **Resume antes de leer.** Si el texto es largo, el botón "Resumen IA" lo
+  resume con Gemini u OpenAI (con tu propia clave) y podés escuchar el resumen.
+- **Se controla desde cualquier app.** Queda en la bandeja del sistema, y con
+  atajos globales pausás o cortás la lectura sin volver a la ventana
+  (por defecto `Ctrl+Alt+P` y `Ctrl+Alt+S`, configurables).
 
-### 🛠️ Productividad sin Fricción
-- **Atajos Globales**: Controla la lectura (Play/Pause/Stop) desde cualquier aplicación con hotkeys configurables.
-- **Modo Offline Inteligente**: Detección automática de conexión. Si no hay internet, Nimbus te cubre con tus voces locales.
-- **Instalador Profesional**: Instalación limpia y segura en Windows.
+## Instalación
 
----
+Descargá `Nimbus-TTS.v1.0.0.exe` desde
+[Releases](https://github.com/Nahuelito22/Nimbus-TTS/releases) y ejecutalo.
+Después, en **Ajustes**, descargá al menos una voz para usarla sin internet.
 
-## 🚀 Instalación Quick-Start
+Para el resumen con IA hace falta una clave de Gemini o de OpenAI, que se carga
+en Ajustes.
 
-1. Descarga el instalador `Nimbus-TTS-Setup.exe` desde la sección de [Releases](https://github.com/Nahuelito22/Nimbus-TTS/releases).
-2. Ejecuta el instalador y sigue los pasos.
-3. Al iniciar, ve a **Ajustes > Modelos** para descargar tus voces favoritas.
-4. ¡Selecciona cualquier texto y presiona tu atajo de teclado para empezar a escuchar!
+## Correrlo desde el código
 
----
+Requiere Python 3.12.
 
-## 🗺️ Roadmap: El Futuro de Nimbus-TTS
-Nimbus no se detiene aquí. Nuestra visión es superar cualquier limitación actual de herramientas de toma de notas:
+```bash
+python -m venv .venv
+.venv\Scripts\activate
+pip install -r requirements.txt
+copy config.example.json config.json
+python main.py
+```
 
-- [ ] **Soporte OCR**: Leer texto directamente desde imágenes o PDFs escaneados.
-- [ ] **Traducción en Tiempo Real**: Escucha cualquier texto en tu idioma preferido.
-- [ ] **Extensión de Navegador**: Integración directa con Chrome/Edge.
-- [ ] **Voces Clonadas**: Posibilidad de añadir tu propia voz al sistema.
-- [ ] **Integración con OneNote/Notion**: Sincronización de notas leídas.
+El ejecutable se arma con PyInstaller (`Nimbus-TTS.spec`) y el instalador con
+Inno Setup (`Nimbus-Setup-Script.iss`).
 
----
+## Estado
 
-## 🤝 Contribuciones
-¡Las ideas son bienvenidas! Siéntete libre de abrir un issue o un pull request para mejorar esta herramienta.
+La versión 1.0 está publicada y la uso. El proyecto está en pausa: la idea es
+retomarlo para que lea PDFs escaneados (con OCR) y para poder mandarle texto
+seleccionado desde cualquier app, sin tener que pegarlo.
 
----
+## Stack
 
-## 📜 Licencia
-Desarrollado con ❤️ por **Nahuelito22**.  
-*Impulsando la accesibilidad y el aprendizaje inteligente.*
+Python, CustomTkinter, Kokoro y Piper (ONNX), Edge TTS, pypdf, Gemini y OpenAI.
+
+## Licencia
+
+MIT. Hecho por [Nahuel Ghilardi](https://www.nahuelghilardi.com.ar).
